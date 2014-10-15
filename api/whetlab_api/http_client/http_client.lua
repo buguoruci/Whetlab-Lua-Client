@@ -1,7 +1,5 @@
-local http = require("socket.http") --luasocket
-local https = require 'ssl.https'
+local https = require('ssl.https')
 local json = require("json") -- luajson
-local io = require("io")
 local ltn12 = require("ltn12")
 
 -- Main HttpClient which is used by Api classes
@@ -183,10 +181,6 @@ function http_client:request(path, body, method, options)
         heads['Accept'] = request_type
     end
     
-    -- if method == 'patch'
-    --     method = 'put'
-    -- end
-
     --- build a http request
     response = {}
     save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    

@@ -1,5 +1,7 @@
 #! /bin/lua
 
+local json = require("json") -- luajson
+
 whetlab_client = require('whetlab_api_client')
 client = whetlab_client('43c5fda8-7ee6-4f72-a090-b679d2f30a2e', {})
 result = client:result(2502)
@@ -42,4 +44,7 @@ for num, res in pairs(result) do
     end
 end
 
-
+-- Create a new experiment
+jsonstr = '{"settings":[{"scale": "linear", "name": "Cooling Time", "min": 0.0, "max": 10.0, "options": null, "experiment": 11, "units": "", "isOutput": false, "type": "float", "id": 25, "size": 1}, {"scale": "linear", "name": "Pinches of Salt", "min": 0.0, "max": 10.0, "options": null, "experiment": 11, "units": "", "isOutput": false, "type": "integer", "id": 24, "size": 1}, {"scale": "linear", "name": "Boiling Time", "min": 0.0, "max": 12.0, "options": null, "experiment": 11, "units": "", "isOutput": false, "type": "float", "id": 23, "size": 1}, {"scale": "linear", "name": "Tastiness", "min": null, "max": null, "options": null, "experiment": 11, "units": "", "isOutput": true, "type": "float", "id": 22, "size": 1}],"name":"Johns Eggsperiment.","description":"Optimizing the recipe for the perfect soft-boiled egg."}'
+experiment = json.decode(jsonstr)
+res = client:experiments():create()
