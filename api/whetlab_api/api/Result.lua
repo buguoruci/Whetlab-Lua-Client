@@ -1,15 +1,15 @@
-local M = {}; M.__index = M
+local Result = {}; Result.__index = Result
 
 local function construct(id, client)
-  local self = setmetatable({ id=id, client=client}, M)
+  local self = setResultetatable({ id=id, client=client}, Result)
   return self
 end
-setmetatable(M, {__call = construct})
+setmetatable(Result, {__call = construct})
 
 -- Return a specific result indexed by id
 -- '/alpha/results/:id/' GET
 --
-function M:get(options)
+function Result:get(options)
         -- if ~exist('options','var')
         --     options = struct;
         -- end
@@ -26,7 +26,7 @@ end
 -- Delete the result instance indexed by id
 -- '/alpha/results/:id/' DELETE
 --
-function M:delete(options)
+function Result:delete(options)
         -- if ~exist('options','var')
         --     options = struct;
         -- end
@@ -49,7 +49,7 @@ end
 -- description - description
 -- runDate - <no value>
 -- id - <no value>
-function M:update(variables, experiment, userProposed, description, runDate, id, options)
+function Result:update(variables, experiment, userProposed, description, runDate, id, options)
         -- if ~exist('options','var')
         --     options = struct;
         -- end
@@ -79,7 +79,7 @@ end
 -- description - description
 -- runDate - <no value>
 -- id - <no value>
-function M:replace(variables, experiment, userProposed, description, runDate, id, options)
+function Result:replace(variables, experiment, userProposed, description, runDate, id, options)
         -- if ~exist('options','var')
         --     options = struct;
         -- end

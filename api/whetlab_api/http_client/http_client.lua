@@ -1,4 +1,5 @@
 local http = require("socket.http") --luasocket
+local https = require 'ssl.https'
 local json = require("json") -- luajson
 local io = require("io")
 local ltn12 = require("ltn12")
@@ -20,7 +21,7 @@ local function construct(objname, auth, options)
 
     self.options = {}
     self.headers = {}
-    self.options['base'] = 'https://api.whetlab.com/'
+    self.options['base'] = 'https://www.whetlab.com/'
     self.options['user_agent'] = 'whetlab_lua_client'
 
     for key,value in pairs(options) do
@@ -42,7 +43,7 @@ local function construct(objname, auth, options)
         self.options['headers'] = nil
     end
 
-    self.headers['Authorization:Bearer'] = self.auth
+    self.headers['Authorization'] = 'Bearer ' .. self.auth
     -- self.auth = auth_handler(self.auth)
     return self
 end -- http_client
@@ -52,29 +53,31 @@ function http_client:get(path, params, options)
     if options == nil then
         options = {}
     end
-    options['query'] = params
+    if params ~= nil then
+        options['query'] = params
+    end
     body = {}
-	response = self.request(path, body, 'get', options)
+	response = self:request(path, body, 'get', options)
     return response
 end
 
 function http_client:post(path, body, options)
-	response = self.request(path, body, 'post', options)
+	response = self:request(path, body, 'post', options)
     return response
 end
 
 function http_client:patch(path, body, options)
-	response = self.request(path, body, 'patch', options)
+	response = self:request(path, body, 'patch', options)
     return response
 end
 
 function http_client:delete(path, body, options)
-	response = self.request(path, body, 'delete', options)
+	response = self:request(path, body, 'delete', options)
     return response
 end
 
 function http_client:put(path, body, options)
-	response = self.request(path, body, 'put', options)
+	response = self:request(path, body, 'put', options)
     return response
 end
 
@@ -95,6 +98,12 @@ end
 -- - Creates the requests with give parameters
 -- - Returns response body after parsing it into correct format
 function http_client:request(path, body, method, options)
+
+    -- print(path)
+    -- print(body)
+    -- print(method)
+    -- print(options)
+
     for key,value in pairs(options) do
         options[key] = value
     end
@@ -108,10 +117,11 @@ function http_client:request(path, body, method, options)
         options['headers'] = nil
     end
     
-    if isfield(options, 'query') then
-    params = {}
-    for key,value in pairs(options['headers']) do
-        params[key] = value
+    if options['query'] ~= nil then
+        params = {}
+        for key,value in pairs(options['query']) do
+            params[key] = value
+        end
     end
 
     if options['user_agent'] ~= nil then
@@ -157,12 +167,16 @@ function http_client:request(path, body, method, options)
         error('Only json requests are currently supported.')
     end
 
-    url = self.base .. '/' .. self.options.api_version .. '/' .. path
+    if self.options['api_version'] == nil then
+        self.options['api_version'] = ''
+    end
+
+    url = self.base .. '/' .. self.options['api_version'] .. '/' .. path
     url = string.gsub(url, "(/+)", "/")
     url = string.gsub(url, '(http:/+)', 'http://') -- Hack to fix http
     url = string.gsub(url, '(https:/+)', 'https://') -- Hack to fix https
 
-    for key,value in pairs(options['headers']) do
+    for key,value in pairs(headers) do
         heads[key] = value
     end
 
@@ -180,27 +194,25 @@ function http_client:request(path, body, method, options)
     save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    
 
     if method == 'get' then
-        ok, code, headers = http.request{url = url .. '?' .. paramString, redirect = true, method = 'GET', headers = heads, source = source, sink = save}
-        -- [outputs,extras] = urlread2([url '?' paramString],...
-        --                             upper(method), '', heads);
+        url = url .. '?' .. paramString
+        print('url:')
+        print(url)
+        ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
     else
-        ok, code, headers = http.request{url = url, redirect = true, method = method, headers = heads, source = source, sink = save}
-        -- [outputs,extras] = urlread2(url,upper(method), ...
-        --                             paramString, heads);
+        ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
     end
 
     --- show that we got a valid response
-    print(code) -- should be 201 for POST success 
-    saveditem = response[1]; -- kinvey appdata responses return arrays (which are tables in Lua)
-    print(saveditem)
+    -- print('Response:--------')
+    -- print(code)
+    -- print(ok)
 
-    --      s = lasterror();
-    --      if strfind(s.message, 'java.net')
-    --          error('MATLAB:HttpConection:ConnectionError',...
-    --              'Could not connect to server.');                         
-    --      else
-    --          rethrow(s);
-    --      end
+    if strfind(s.message, 'java.net')
+      error('Lua:HttpConection:ConnectionError',...
+         'Could not connect to server.');
+    else
+     rethrow(s);
+    end
     -- end
     -- Display a reasonable amount of information if the
     -- Http request fails for whatever reason
@@ -223,7 +235,6 @@ function http_client:request(path, body, method, options)
     --     response.body = loadjson(outputs);
     -- end
 
-    return response
+    return response[1]
 end -- function
-end
 return http_client
