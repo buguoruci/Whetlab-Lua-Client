@@ -192,8 +192,6 @@ function http_client:request(path, body, method, options)
 
     if method == 'get' then
         url = url .. '?' .. paramString
-        print('url:')
-        print(url)
         ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
     else
         ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
@@ -201,10 +199,11 @@ function http_client:request(path, body, method, options)
 
     -- Convert the json back to a lua table
     if response[1] ~= nil then
-        result = json.decode(response[1])
+        result = json.decode(table.concat(response))
     else
         result = nil
     end
+
     --- show that we got a valid response
     -- print('Response:--------')
     -- print(code)

@@ -1,4 +1,6 @@
 Result = require('api.Result')
+Experiment = require('api.Experiment')
+Experiments = require('api.Experiments')
 http_client = require('http_client.http_client')
 
 local client = {}; client.__index = client
@@ -21,57 +23,57 @@ end
 -- Returns the variables set for a user
 --
 function client:variables()
-    return api.Variables(self.httpclient)
+    return Variables(self.httpclient)
 end
 
 -- Manipulate the experiment indexed by id.
 --
 -- id - Identifier of corresponding experiment
 function client:experiment(id)
-    return api.Experiment(id, self.httpclient)
+    return Experiment(id, self.httpclient)
 end
 
 -- Returns the settings config for an experiment
 --
 function client:settings()
-    return api.Settings(self.httpclient)
+    return Settings(self.httpclient)
 end
 
 -- Return user list
 --
 function client:users()
-    return api.Users(self.httpclient)
+    return Users(self.httpclient)
 end
 
 -- Manipulate the results set for an experiment given filters
 --
 function client:results()
-    return api.Results(self.httpclient)
+    return Results(self.httpclient)
 end
 
 -- Returns the tasks set for a user
 --
 function client:tasks()
-    return api.Tasks(self.httpclient)
+    return Tasks(self.httpclient)
 end
 
 -- Ask the server to propose a new set of parameters to run the next experiment
 --
 -- taskid - Identifier of corresponding task
 function client:suggest(taskid)
-    return api.Suggest(taskid, self.httpclient)
+    return Suggest(taskid, self.httpclient)
 end
 
 -- Returns the experiments set for a user
 --
 function client:experiments()
-    return api.Experiments(self.httpclient)
+    return Experiments(self.httpclient)
 end
 
 -- Manipulate an experimental settings object
 --
 function client:setting()
-    return api.Setting(self.httpclient)
+    return Setting(self.httpclient)
 end
 
 return client
