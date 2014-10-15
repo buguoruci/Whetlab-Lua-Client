@@ -9,9 +9,6 @@ local http_client = {}; http_client.__index = http_client
 -- 'auth' = auth, 'options' = options, 'headers' = {}, 'base' = ''
 local function construct(objname, auth, options)
     local self = setmetatable({}, http_client)
-
-    print(auth)
-    print(options)
     if type(auth) == "string" then
         self.auth = auth
     else
@@ -21,7 +18,7 @@ local function construct(objname, auth, options)
 
     self.options = {}
     self.headers = {}
-    self.options['base'] = 'https://www.whetlab.com/'
+    self.options['base'] = 'https://www.whetlab.com/api/'
     self.options['user_agent'] = 'whetlab_lua_client'
 
     for key,value in pairs(options) do
@@ -202,17 +199,23 @@ function http_client:request(path, body, method, options)
         ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
     end
 
+    -- Convert the json back to a lua table
+    if response[1] ~= nil then
+        result = json.decode(response[1])
+    else
+        result = nil
+    end
     --- show that we got a valid response
     -- print('Response:--------')
     -- print(code)
     -- print(ok)
 
-    if strfind(s.message, 'java.net')
-      error('Lua:HttpConection:ConnectionError',...
-         'Could not connect to server.');
-    else
-     rethrow(s);
-    end
+    -- if strfind(s.message, 'java.net')
+    --   error('Lua:HttpConection:ConnectionError',...
+    --      'Could not connect to server.');
+    -- else
+    --  rethrow(s);
+    -- end
     -- end
     -- Display a reasonable amount of information if the
     -- Http request fails for whatever reason
@@ -235,6 +238,6 @@ function http_client:request(path, body, method, options)
     --     response.body = loadjson(outputs);
     -- end
 
-    return response[1]
+    return result
 end -- function
 return http_client

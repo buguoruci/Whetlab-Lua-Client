@@ -1,7 +1,9 @@
 local Result = {}; Result.__index = Result
 
-local function construct(id, client)
-  local self = setResultetatable({ id=id, client=client}, Result)
+local function construct(objname, id, client)
+  local self = setmetatable({ id=id, client=client}, Result)
+  self.id = id
+  self.client = client
   return self
 end
 setmetatable(Result, {__call = construct})
@@ -10,16 +12,16 @@ setmetatable(Result, {__call = construct})
 -- '/alpha/results/:id/' GET
 --
 function Result:get(options)
-        -- if ~exist('options','var')
-        --     options = struct;
-        -- end
-        if options['query'] ~= nil then
-            body = options['query']
+        body = {}
+        if options ~= nil then
+            if options['query'] ~= nil then
+                body = options['query']        
+            end
         else
-            body = {}
+            options = {}
         end
-        
-        response = self.client.get('/alpha/results/' .. self.id .. '/', body, options);
+
+        response = self.client:get('/alpha/results/' .. self.id .. '/', body, options)
         return response
 end
 
@@ -27,16 +29,15 @@ end
 -- '/alpha/results/:id/' DELETE
 --
 function Result:delete(options)
-        -- if ~exist('options','var')
-        --     options = struct;
-        -- end
-        if options['body'] ~= nil then
-            body = options['body']
+        body = {}
+        if options ~= nil then
+            if options['body'] ~= nil then
+                body = options['body']
+            end
         else
-            body = {}
+            options = {}
         end
-        
-        response = self.client.delete('/alpha/results/' .. self.id .. '/', body, options);
+        response = self.client:delete('/alpha/results/' .. self.id .. '/', body, options)
         return response
 end
 
@@ -50,13 +51,13 @@ end
 -- runDate - <no value>
 -- id - <no value>
 function Result:update(variables, experiment, userProposed, description, runDate, id, options)
-        -- if ~exist('options','var')
-        --     options = struct;
-        -- end
-        if options['body'] ~= nil then
-            body = options['body']
+        body = {}
+        if options ~= nil then
+            if options['body'] ~= nil then
+                body = options['body']
+            end
         else
-            body = {}
+            options = {}
         end
         
         body['variables'] = variables
@@ -80,13 +81,13 @@ end
 -- runDate - <no value>
 -- id - <no value>
 function Result:replace(variables, experiment, userProposed, description, runDate, id, options)
-        -- if ~exist('options','var')
-        --     options = struct;
-        -- end
-        if options['body'] then
-            body = options['body']
+        body = {}
+        if options ~= nil then
+            if options['body'] ~= nil then
+                body = options['body']
+            end
         else
-            body = struct
+            options = {}
         end
         
         body['variables'] = variables
@@ -100,3 +101,4 @@ function Result:replace(variables, experiment, userProposed, description, runDat
         return response
 end
 
+return Result
