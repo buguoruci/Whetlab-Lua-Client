@@ -2,8 +2,6 @@ local Result = {}; Result.__index = Result
 
 local function construct(objname, id, client)
   local self = setmetatable({ id=id, client=client}, Result)
-  self.id = id
-  self.client = client
   return self
 end
 setmetatable(Result, {__call = construct})
