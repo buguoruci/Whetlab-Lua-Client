@@ -1,9 +1,12 @@
 #! /bin/lua
 
+local os = require("os")
 local json = require("json") -- luajson
 
+api_token = ''
+
 whetlab_client = require('whetlab_api_client')
-client = whetlab_client('43c5fda8-7ee6-4f72-a090-b679d2f30a2e', {})
+client = whetlab_client(api_token, {})
 result = client:result(2502)
 res = result:get()
 for k,v in pairs(res) do
@@ -51,7 +54,35 @@ res = client:experiments():create(experiment['name'], experiment['description'],
 for k,v in pairs(res) do
     print(k, v)
 end
+exptid = res['id']
 
+-- Spawn a suggestion
+res = client:suggest(exptid):go()
+for k,v in pairs(res) do
+    print(k, v)
+end
+resid = res['id']
+variables = res['variables']
+for k,v in pairs(variables) do
+    print(k, v)
+end
 
--- Add a result
+for i = 1,30 do
+    os.execute("sleep " .. tonumber(1))
+    res = client:result(resid):get()
+    variables = res['variables']
+    if next(variables) ~= nil then
+        break
+    end
+end
+
+print('--------------')
+print('New Suggestion')
+print('--------------')
+for i,vars in pairs(variables) do
+    for k,v in pairs(vars) do
+        print(k, v)
+    end
+end
+
 

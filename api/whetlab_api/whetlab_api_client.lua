@@ -1,5 +1,8 @@
 Result = require('api.Result')
 Results = require('api.Results')
+Setting = require('api.Setting')
+Settings = require('api.Settings')
+Suggest = require('api.Suggest')
 Experiment = require('api.Experiment')
 Experiments = require('api.Experiments')
 http_client = require('http_client.http_client')
@@ -61,8 +64,8 @@ end
 -- Ask the server to propose a new set of parameters to run the next experiment
 --
 -- taskid - Identifier of corresponding task
-function client:suggest(taskid)
-    return Suggest(taskid, self.httpclient)
+function client:suggest(exptid)
+    return Suggest(exptid, self.httpclient)
 end
 
 -- Returns the experiments set for a user

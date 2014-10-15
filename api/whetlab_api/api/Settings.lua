@@ -25,3 +25,4 @@ function Settings:get(self, experiment, options)
     response = self.client:get('/alpha/settings/', body, options);
     return response
 end
+return Settings

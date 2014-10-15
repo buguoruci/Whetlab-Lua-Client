@@ -10,33 +10,33 @@ setmetatable(Result, {__call = construct})
 -- '/alpha/results/:id/' GET
 --
 function Result:get(options)
-        body = {}
-        if options ~= nil then
-            if options['query'] ~= nil then
-                body = options['query']        
-            end
-        else
-            options = {}
+    body = {}
+    if options ~= nil then
+        if options['query'] ~= nil then
+            body = options['query']        
         end
+    else
+        options = {}
+    end
 
-        response = self.client:get('/alpha/results/' .. self.id .. '/', body, options)
-        return response
+    response = self.client:get('/alpha/results/' .. self.id .. '/', body, options)
+    return response
 end
 
 -- Delete the result instance indexed by id
 -- '/alpha/results/:id/' DELETE
 --
 function Result:delete(options)
-        body = {}
-        if options ~= nil then
-            if options['body'] ~= nil then
-                body = options['body']
-            end
-        else
-            options = {}
+    body = {}
+    if options ~= nil then
+        if options['body'] ~= nil then
+            body = options['body']
         end
-        response = self.client:delete('/alpha/results/' .. self.id .. '/', body, options)
-        return response
+    else
+        options = {}
+    end
+    response = self.client:delete('/alpha/results/' .. self.id .. '/', body, options)
+    return response
 end
 
 -- Update a specific result indexed by id
@@ -49,24 +49,24 @@ end
 -- runDate - <no value>
 -- id - <no value>
 function Result:update(variables, experiment, userProposed, description, runDate, id, options)
-        body = {}
-        if options ~= nil then
-            if options['body'] ~= nil then
-                body = options['body']
-            end
-        else
-            options = {}
+    body = {}
+    if options ~= nil then
+        if options['body'] ~= nil then
+            body = options['body']
         end
-        
-        body['variables'] = variables
-        body['experiment'] = experiment
-        body['userProposed'] = userProposed
-        body['description'] = description
-        body['runDate'] = runDate
-        body['id'] = id
+    else
+        options = {}
+    end
+    
+    body['variables'] = variables
+    body['experiment'] = experiment
+    body['userProposed'] = userProposed
+    body['description'] = description
+    body['runDate'] = runDate
+    body['id'] = id
 
-        response = self.client.patch('/alpha/results/' .. self.id .. '/', body, options);
-        return response
+    response = self.client:patch('/alpha/results/' .. self.id .. '/', body, options);
+    return response
 end
 
 -- Replace a specific result indexed by id. To be used instead of update if HTTP patch is unavailable
@@ -79,24 +79,24 @@ end
 -- runDate - <no value>
 -- id - <no value>
 function Result:replace(variables, experiment, userProposed, description, runDate, id, options)
-        body = {}
-        if options ~= nil then
-            if options['body'] ~= nil then
-                body = options['body']
-            end
-        else
-            options = {}
+    body = {}
+    if options ~= nil then
+        if options['body'] ~= nil then
+            body = options['body']
         end
-        
-        body['variables'] = variables
-        body['experiment'] = experiment
-        body['userProposed'] = userProposed
-        body['description'] = description
-        body['runDate'] = runDate
-        body['id'] = id
+    else
+        options = {}
+    end
+    
+    body['variables'] = variables
+    body['experiment'] = experiment
+    body['userProposed'] = userProposed
+    body['description'] = description
+    body['runDate'] = runDate
+    body['id'] = id
 
-        response = self.client.put('/alpha/results/' .. self.id .. '/', body, options);
-        return response
+    response = self.client:put('/alpha/results/' .. self.id .. '/', body, options);
+    return response
 end
 
 return Result
