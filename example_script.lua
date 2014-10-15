@@ -29,3 +29,17 @@ for k, v in pairs(exp) do
 	print(k, v)
 end
 
+-- Grab the results corresponding to an experiment
+print('--------------------')
+print('Results:')
+print('--------------------')
+options = {query={experiment=id}}
+result = client:results():get(options)['results']
+print(result)
+for num, res in pairs(result) do
+    for k,v in pairs(res) do
+        print(k, v)
+    end
+end
+
+

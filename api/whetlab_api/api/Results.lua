@@ -20,7 +20,7 @@ function Results:get(options)
         options = {}
     end
 
-    response = self.client:get('/alpha/results', body, options)
+    response = self.client:get('/alpha/results/', body, options)
     return response
 end
 

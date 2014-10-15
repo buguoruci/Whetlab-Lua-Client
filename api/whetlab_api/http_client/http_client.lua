@@ -149,7 +149,8 @@ function http_client:request(path, body, method, options)
                 if params ~= nil then
                     -- Convert parameters to a url encoded string
                     for key,value in pairs(params) do
-                        paramString = paramString .. self.url_encode(params[key]) .. '=' .. self.url_encode(params[value]) .. '&'
+                        print(key,value)
+                        paramString = paramString .. self:url_encode(key) .. '=' .. self:url_encode(value) .. '&'
                     end
                 end
             else

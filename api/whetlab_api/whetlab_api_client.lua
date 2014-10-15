@@ -1,4 +1,5 @@
 Result = require('api.Result')
+Results = require('api.Results')
 Experiment = require('api.Experiment')
 Experiments = require('api.Experiments')
 http_client = require('http_client.http_client')
