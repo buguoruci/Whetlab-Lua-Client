@@ -47,4 +47,11 @@ end
 -- Create a new experiment
 jsonstr = '{"settings":[{"scale": "linear", "name": "Cooling Time", "min": 0.0, "max": 10.0, "options": null, "experiment": 11, "units": "", "isOutput": false, "type": "float", "id": 25, "size": 1}, {"scale": "linear", "name": "Pinches of Salt", "min": 0.0, "max": 10.0, "options": null, "experiment": 11, "units": "", "isOutput": false, "type": "integer", "id": 24, "size": 1}, {"scale": "linear", "name": "Boiling Time", "min": 0.0, "max": 12.0, "options": null, "experiment": 11, "units": "", "isOutput": false, "type": "float", "id": 23, "size": 1}, {"scale": "linear", "name": "Tastiness", "min": null, "max": null, "options": null, "experiment": 11, "units": "", "isOutput": true, "type": "float", "id": 22, "size": 1}],"name":"Johns Eggsperiment.","description":"Optimizing the recipe for the perfect soft-boiled egg."}'
 experiment = json.decode(jsonstr)
-res = client:experiments():create()
+res = client:experiments():create(experiment['name'], experiment['description'], experiment['settings'])
+for k,v in pairs(res) do
+    print(k, v)
+end
+
+
+-- Add a result
+

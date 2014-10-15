@@ -38,8 +38,8 @@ function Experiment:delete(options)
             options = {}
         end        
 
-        response = self.client.delete('/alpha/experiments/' .. self.id .. '/', body, options)
-        return response        
+        response = self.client:delete('/alpha/experiments/' .. self.id .. '/', body, options)
+        return response
 end
 
 return Experiment
