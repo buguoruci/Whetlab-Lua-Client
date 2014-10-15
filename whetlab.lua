@@ -7,18 +7,33 @@ local default_values = {size = 1, scale = 'linear', units = 'Reals', type = 'flo
 local INF_PAGE_SIZE = 1000000
 
 function read_dot_file()
-    vars = struct()
-    if exist('~/.whetlab', 'file') > 0                
-        fid = fopen('~/.whetlab')
-        tline = fgetl(fid)
-        while ischar(tline)
-            if ~isempty(strfind(tline,'=')) && ~strcmp(tline(1), '#') && ~strcmp(tline(1), '--')
-                C = strsplit(tline, '=')
-                vars.(strtrim(C{1})) = strtrim(C{2})
-            end
-            tline = fgetl(fid)
+    vars = {}
+    -- Get local .whetlab file
+    local fid = io.open('.whetlab','r')
+
+    -- If can't get .whetlab file, get ~/.whetlab
+    if not fid then fid = io.open('~/.whetlab','r') end
+
+    if not fid then
+        return vars
+    end
+
+    function trim(s)
+      return s:gsub("^%s+", ""):gsub("%s+$", "")
+    end
+
+    for line in fid.lines() do
+        if line:len() ~= 0 and line:sub(1,1) ~= '#' and line:sub(1,1) ~= '%' then
+            -- Split into key and value
+            pos_equal = string.find(line,'=')
+            key = trim(string.sub(line,1,pos_equal-1))
+            val = trim(string.sub(line,pos_equal+1))
+            vars[key] = val
         end
     end
+
+    fid:close()
+    return vars
 end
 
 function delete_experiment(name, access_token)
@@ -126,79 +141,63 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     self.outcome_values        = {}
 
     -- The set of result IDs corresponding to suggested jobs that are pending
-    self.pending_ids           = []
+    self.pending_ids           = {}
     self.experiment            = ''
     self.experiment_description= ''
     self.experiment_id = -1
     self.outcome_name = ''
     self.parameters = parameters
 
-    assert(usejava('jvm'),'This code requires Java')
-    if (nargin <= 4)
-        resume = true
-    end
-    experiment_id = -1
+    self.resume = resume or true
+    self.experiment_id = -1
 
-    vars = whetlab.read_dot_file()
+    local vars = read_dot_file()
 
-    if (nargin <= 5 | isempty(access_token))
-        try
-            access_token = vars.access_token
-        catch
-            error('You must specify your access token in the variable access_token either in the client or in your ~/.whetlab file')
-        end
-    end
-
-    if nargin <= 6
-        retries = true
+    access_token = access_token or vars.access_token
+    if not access_token then
+        error('You must specify your access token in the variable access_token either in the client or in your ~/.whetlab file')
     end
 
     -- Make a few obvious asserts
-    if (isempty(name) || ~strcmp(class(name), 'char'))
-        error('Whetlab:ValueError', 'Name of experiment must be a non-empty string.')
+    if name == '' then
+        error('Name of experiment must be a non-empty string.')
     end
 
-    if (~strcmp(class(description), 'char'))
-        error('Whetlab:ValueError', 'Description of experiment must be a string.')
+    if type(description) ~= 'string' then
+        error('Description of experiment must be a string.')
     end
 
     -- Create REST server client
-    if isfield(vars, 'api_url')
-        hostname = vars.api_url
-    else
-        hostname = 'https://www.whetlab.com/'
-    end
+    local hostname = vars.api_url or 'https://www.whetlab.com/'
+
     self.client = SimpleREST(access_token, hostname, retries)
 
-    -- For now, we support one task per experiment, and the name and description of the task
-    -- is the same as the experiment's
     self.experiment_description = description
     self.experiment = name
     self.outcome_name = outcome.name
 
-    if resume
+    if resume then
         -- Try to resume if the experiment exists. If it doesn't exist, we'll create it.
         self.experiment_id = experiment_id
-        try
-            self = self.sync_with_server()
-            disp(['Resuming experiment: ' self.experiment])
-            return -- Successfully resumed
-        catch err
-            if ~strcmp(err.identifier, 'Whetlab:ExperimentNotFoundError')
-                rethrow(err)
+        status, err = pcall(self:sync_with_server())
+        if status then
+            print('Resuming experiment ' .. self.experiment)
+        else
+            if err ~= '???Whetlab:ExperimentNotFoundError?????') then
+                error(err)
             end
         end
     end
-
-    if ~strcmp(class(parameters), 'struct') && ~strcmp(class(parameters), 'cell')
+    --- I'm here
+    if ~strcmp(class(parameters), 'struct') and ~strcmp(class(parameters), 'cell') then
         error('Whetlab:ValueError', 'Parameters of experiment must be a structure array or a cell array.')
     end
 
-    if ~strcmp(class(outcome), 'struct') && ~isempty(fieldnames(outcome))
+    if ~strcmp(class(outcome), 'struct') and ~isempty(fieldnames(outcome)) then
         error('Whetlab:ValueError', 'Outcome of experiment must be a non-empty struct.')
     end
 
-    if ~isfield(outcome, 'name')
+    if ~isfield(outcome, 'name') then
         error('Whetlab:ValueError', 'Argument outcome should have a field called: name.')
     end
     self.outcome_name = outcome.name
@@ -207,32 +206,32 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     -- Add specification of parameters
     settings = {}     
     for i = 1:numel(parameters)
-        if isstruct(parameters)
+        if isstruct(parameters) then
             param = parameters(i)
         else -- A cell array
             param = parameters{i}
         end
 
-        if ~isfield(param, 'name')
+        if ~isfield(param, 'name') then
             error('Whetlab:UnnamedParameterError', 'You must specify a name for each parameter.')
         end
 
-        if ~isfield(param,'type'), param.('type') = self.default_values.type end
+        if ~isfield(param,'type') then param.('type') = self.default_values.type end
 
-        if strcmp(param.type, 'int')
+        if strcmp(param.type, 'int') then
             param.('type') = 'integer'
         end
 
-        if strcmp(param.type, 'enum')
-            if ~isfield(param, 'options')  || numel(param.options) < 2
+        if strcmp(param.type, 'enum') then
+            if ~isfield(param, 'options')  or numel(param.options) < 2 then
                  error('Whetlab:ValueError', ['Parameter ' param.name ' is an enum type which requires the field options with more than one element.'])
             end
             -- Add default parameters if not present
-            if ~isfield(param,'isOutput'), param.('isOutput') = false end
+            if ~isfield(param,'isOutput') then param.('isOutput') = false end
         else
             properties = fieldnames(param)
             for ii = 1:numel(properties)
-                if ~isfield(self.supported_properties, properties{ii})
+                if ~isfield(self.supported_properties, properties{ii}) then
                     error('Whetlab:ValueError', ['Parameter ' param.name ': property ' properties{ii} ' is not supported.'])
                 end
             end
@@ -240,18 +239,18 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
             -- Check if required properties are present
             properties = fieldnames(self.required_properties)
             for ii = 1:numel(properties)
-                if ~isfield(param, properties{ii})
+                if ~isfield(param, properties{ii}) then
                     error('Whetlab:ValueError', ['Parameter ' param.name ': property ' properties{ii} ' must be defined.'])
                 end
             end
 
             -- Add default parameters if not present
-            if ~isfield(param,'units'), param.('units') = self.default_values.units end
-            if ~isfield(param,'scale'), param.('scale') = self.default_values.scale end
-            if ~isfield(param,'isOutput'), param.('isOutput') = false end
+            if ~isfield(param,'units') then param.('units') = self.default_values.units end
+            if ~isfield(param,'scale') then param.('scale') = self.default_values.scale end
+            if ~isfield(param,'isOutput') then param.('isOutput') = false end
 
             -- Check compatibility of properties
-            if param.('min') >= param.('max')
+            if param.('min') >= param.('max') then
                 error('Whetlab:ValueError', ['Parameter ' param.name ': min should be smaller than max.'])
             end
         end
@@ -273,10 +272,9 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
         experiment_id = self.client.create(name, description, settings)
     catch err
         -- Resume, unless got a ConnectionError
-        if resume && ...
-            ~strcmp(err.identifier, 'MATLAB:HttpConection:ConnectionError')
+        if resume and ~strcmp(err.identifier, 'MATLAB:HttpConection:ConnectionError') then
             -- This experiment was just already created - race condition.
-            self = self.sync_with_server()
+            self = self.sync_with_server() 
             return
         else
             rethrow(err)
@@ -287,7 +285,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 
     -- Check if there are pending experiments
     p = self.pending()
-    if length(p) > 0
+    if length(p) > 0 then
         disp(sprintf('INFO: this experiment currently has --d jobs (results) that are pending.',length(p)))
     end
         return self
@@ -316,9 +314,9 @@ function Experiment:sync_with_server()
 
     found = false
 
-    if self.experiment_id < 0
+    if self.experiment_id < 0 then
         self.experiment_id = self.client.find_experiment(self.experiment)
-        if self.experiment_id < 0
+        if self.experiment_id < 0 then
             error('Whetlab:ExperimentNotFoundError',...
                 'Experiment with name \"--s\" and description \"--s\" not found.',...
                  self.experiment, self.experiment_description)
@@ -347,13 +345,13 @@ function Experiment:sync_with_server()
 
         self.params_to_setting_ids.put(name, id)
 
-        if isOutput
+        if isOutput then
             self.outcome_name = name
         else
-            if ~strcmp(vartype, 'enum')
+            if ~strcmp(vartype, 'enum') then
                 self.parameters{end+1} = struct('name', name, 'type', vartype,'min',minval,'max',maxval,...
                              'size', varsize,'isOutput', false, 'units', units,'scale', scale)
-            elseif strcmp(vartype, 'enum')
+            elseif strcmp(vartype, 'enum') then
             options = param.('options')
                 self.parameters{end+1} = struct('name', name, 'type', vartype,'min',minval,'max',maxval,...
                              'size', varsize,'isOutput', false, 'units', units,'scale', scale,'options',options)
@@ -380,15 +378,15 @@ function Experiment:sync_with_server()
 
             id = v.('id')
             name = v.('name')                
-            if isequal(name, self.outcome_name)
+            if isequal(name, self.outcome_name) then
                 -- Anything that's passed back as a string is assumed to be a
                 -- constraint violation.
-                if isstr(v.value)
+                if isstr(v.value) then
                     v.value = -inf
                 end
 
                 -- Don't record the outcome if the experiment is pending
-                if ~isempty(v.value)
+                if ~isempty(v.value) then
                     self.ids_to_outcome_values.put(res_id, v.value)
                 else -- Treat NaN as the special indicator that the experiment is pending. We use -INF for constraint violations
                     self.ids_to_outcome_values.put(res_id, nan)
@@ -438,7 +436,7 @@ function Experiment:pending()
     pend = []
     for j = 1:length(outcomes)
         val = outcomes(j)
-        if isnan(val)
+        if isnan(val) then
             ret(i) = loadjson(self.ids_to_param_values.get(ids(j)))
             i = i + 1
             pend = ret
@@ -466,7 +464,7 @@ function Experiment:clear_pending()
     --   scientist.clear_pending()
     
     jobs = self.pending()
-    if ~isempty(jobs)
+    if ~isempty(jobs) then
         for i = 1:numel(jobs)
             self.cancel(jobs(i))
         end
@@ -518,7 +516,7 @@ function Experiment:suggest()
     -- Put in a nicer format
     -- next = {}
     for i = 1:numel(variables)
-        if ~strcmp(variables{i}.name, self.outcome_name)
+        if ~strcmp(variables{i}.name, self.outcome_name) then
             next.(variables{i}.name) = variables{i}.value
             -- next{end+1} = variables{i}.name
             -- next{end+1} = variables{i}.value
@@ -564,14 +562,14 @@ function Experiment:get_id(param_values)
     self = self.sync_with_server()
 
     -- Remove key result_id_ if present
-    if isfield(param_values,'result_id_')
+    if isfield(param_values,'result_id_') then
         param_values = rmfield(param_values,'result_id_')
     end
 
     id = -1
     keys = self.ids_to_param_values.keySet().toArray
     for i = 1:numel(keys)
-        if isequal(savejson('', param_values), self.ids_to_param_values.get(keys(i)))
+        if isequal(savejson('', param_values), self.ids_to_param_values.get(keys(i))) then
             id = keys(i)
             break
         end
@@ -621,19 +619,19 @@ function Experiment:update(param_values, outcome_val)
     --   result = 1.7  
     --   scientist.update(job, result)
     --
-    if (length(outcome_val) > 1) or ((isstruct(param_values) && length(param_values) > 1))
+    if (length(outcome_val) > 1) or ((isstruct(param_values) and length(param_values) > 1)) then
         error('Whetlab:ValueError', 'Update does not accept more than one result at a time')
     end
 
 
-    if isfield(param_values,'result_id_')
+    if isfield(param_values,'result_id_') then
         result_id = param_values.('result_id_')
     else
         -- Check whether this param_values has a result ID
         result_id = self.get_id(param_values)
     end
 
-    if result_id == -1
+    if result_id == -1 then
         -- - Add new results with param_values and outcome_val
 
         -- Create variables for new result
@@ -641,16 +639,16 @@ function Experiment:update(param_values, outcome_val)
         for i = 1:numel(param_names)
             name = param_names(i)
             setting_id = self.params_to_setting_ids.get(name)
-            if isfield(param_values, name)
+            if isfield(param_values, name) then
                 value = param_values.(name)
-            elseif strcmp(name, self.outcome_name)
+            elseif strcmp(name, self.outcome_name) then
                 value = outcome_val
                 -- Convert the outcome to a constraint violation if it's not finite
                 -- This is needed to send the JSON in a manner that will be parsed
                 -- correctly server-side.
-                if isnan(outcome_val)
+                if isnan(outcome_val) then
                     value = 'NaN'
-                elseif ~isfinite(outcome_val)
+                elseif ~isfinite(outcome_val) then
                     value = '-infinity' 
                 end
             else
@@ -663,24 +661,20 @@ function Experiment:update(param_values, outcome_val)
         result.variables = variables
         result_id = self.client.add_result(variables, self.experiment_id)
 
-        -- if isstruct(param_values)
-        --     param_values = whetlab.struct_2_cell_params(param_values)
-        -- end
-
         self.ids_to_param_values.put(result_id, savejson('',param_values))
     else
         result = self.client.get_result(result_id)
 
         for i = 1:numel(result.variables)
             var = result.variables{i}
-            if strcmp(var.('name'), self.outcome_name)
+            if strcmp(var.('name'), self.outcome_name) then
                 -- Convert the outcome to a constraint violation if it's not finite
                 -- This is needed to send the JSON in a manner that will be parsed
                 -- correctly server-side.                    
                 result.variables{i}.('value') = outcome_val
-                if isnan(outcome_val)
+                if isnan(outcome_val) then
                     result.variables{i}.('value') = 'NaN'
-                elseif ~isfinite(outcome_val)
+                elseif ~isfinite(outcome_val) then
                     result.variables{i}.('value') = '-infinity'
                 end
                 self.outcome_values.put(result_id, savejson('',var))
@@ -717,11 +711,11 @@ function Experiment:cancel(param_values)
     
     -- Check whether this param_values has a results ID
     id = self.get_id(param_values)
-    if id > 0
+    if id > 0 then
         self.ids_to_param_values.remove(num2str(id))
 
         -- Delete from internals
-        if self.ids_to_outcome_values.containsKey(id)
+        if self.ids_to_outcome_values.containsKey(id) then
             self.ids_to_outcome_values.remove(id)
         end
             
@@ -768,7 +762,7 @@ function Experiment:best()
     result = self.client.get_result(result_id)
     for i = 1:numel(result.('variables'))
         v = result.('variables'){i}
-        if ~strcmp(v.name, self.outcome_name)
+        if ~strcmp(v.name, self.outcome_name) then
             param_values.(v.name) = v.value
         end
     end
