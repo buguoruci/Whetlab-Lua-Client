@@ -13,6 +13,16 @@ function tablelength(T)
   return count
 end
 
+-- Helper function for different types of errors
+
+function value_error(msg)
+    error('Whetlab:ValueError: ' .. msg)
+end
+
+function enf_error(msg)
+    error('Whetlab:ExperimentNotFoundError: ' .. msg)
+end
+
 function read_dot_file()
     vars = {}
     -- Get local .whetlab file
@@ -32,9 +42,9 @@ function read_dot_file()
     for line in fid.lines() do
         if line:len() ~= 0 and line:sub(1,1) ~= '#' and line:sub(1,1) ~= '%' then
             -- Split into key and value
-            pos_equal = string.find(line,'=')
-            key = trim(string.sub(line,1,pos_equal-1))
-            val = trim(string.sub(line,pos_equal+1))
+            pos_equal = line:find('=')
+            key = trim(line:sub(1,pos_equal-1))
+            val = trim(line:sub(pos_equal+1))
             vars[key] = val
         end
     end
@@ -162,16 +172,16 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 
     access_token = access_token or vars.access_token
     if not access_token then
-        error('You must specify your access token in the variable access_token either in the client or in your ~/.whetlab file')
+        value_error('You must specify your access token in the variable access_token either in the client or in your ~/.whetlab file')
     end
 
     -- Make a few obvious asserts
     if name == '' then
-        error('Name of experiment must be a non-empty string.')
+        value_error('Name of experiment must be a non-empty string.')
     end
 
     if type(description) ~= 'string' then
-        error('Description of experiment must be a string.')
+        value_error('Description of experiment must be a string.')
     end
 
     -- Create REST server client
@@ -186,26 +196,26 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     if resume then
         -- Try to resume if the experiment exists. If it doesn't exist, we'll create it.
         self.experiment_id = experiment_id
-        status, err = pcall(self:sync_with_server())
+        status, err = pcall(self:sync_with_server)
         if status then
             print('Resuming experiment ' .. self.experiment)
         else
-            if err ~= '???Whetlab:ExperimentNotFoundError?????') then
+            if not err:find('Whetlab:ExperimentNotFoundError:') then
                 error(err)
             end
         end
     end
 
     if type(parameters) ~= "table" then
-        error('Parameters of experiment must be a table.')
+        value_error('Parameters of experiment must be a table.')
     end
 
     if type(outcome) ~= "table" then
-        error('Outcome of experiment must be a table.')
+        value_error('Outcome of experiment must be a table.')
     end
 
     if outcome['name'] == nil then
-        error('Lua:ValueError: Argument outcome should have a field called: name.')
+        value_error('Argument outcome should have a field called: name.')
     end
     self.outcome_name = outcome.name
 
@@ -220,19 +230,19 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 
         if param['type'] == 'enum' then
             if param['options'] == nil or tableLength(param['options']) < 2 then
-                error('Whetlab:ValueError Parameter ' .. name .. ' is an enum type which requires the field options with more than one element.')
+                value_error('Parameter ' .. name .. ' is an enum type which requires the field options with more than one element.')
             end        
         else
             for key,v in pairs(param) do
                 if supported_properties[key] == nil then
-                    error('Whetlab:ValueError Parameter ' .. name .. ': property ' .. key .. ' is not supported.')
+                    value_error('Parameter ' .. name .. ': property ' .. key .. ' is not supported.')
                 end
             end
 
             -- Check if required properties are present
             for key,v in pairs(required_properties) do
                 if param[key] == nil then
-                    error('Whetlab:ValueError Parameter ' .. name .. ': property ' .. key .. ' must be defined.'])
+                    value_error('Parameter ' .. name .. ': property ' .. key .. ' must be defined.'])
                 end
             end
 
@@ -243,7 +253,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 
             -- Check compatibility of properties
             if param.min >= param.max then
-                error('Whetlab:ValueError Parameter ' .. name .. ': min should be smaller than max.')
+                value_error('Parameter ' .. name .. ': min should be smaller than max.')
             end
         end
         settings[name] = param
@@ -257,29 +267,29 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     outcome.name = self.outcome_name
     settings[outcome.name] = outcome
 
-    -- I'm here
-    success, experiment_id = pcall(self.client:create(name, description, settings))
-    if ~success then
+    status, err = pcall(function () return self.client:create(name, description, settings) end)
+    if not status then
         -- Resume, unless got a ConnectionError
-        if resume and err.identifier, 'MATLAB:HttpConection:ConnectionError') then
+        if resume and err ~= '???Whetlab:ExperimentExists?????') then
             -- This experiment was just already created - race condition.
-            self = self.sync_with_server() 
+            self:sync_with_server()
             return
         else
-            error(experiment_id)
+            error(err)
         end
+    else
+        experiment_id = err
     end
 
     self.experiment_id = experiment_id
 
     -- Check if there are pending experiments
-    p = self.pending()
+    p = self:pending()
     if tableLength(p) > 0 then
-        printf('INFO: this experiment currently has %d jobs (results) that are pending.',tableLength(p))
+        print('INFO: this experiment currently has %d jobs (results) that are pending.' .. tableLength(p))
     end
 end -- Experiment()
 
--- I'm here
 function Experiment:sync_with_server()
     ---- sync_with_server(self)
     --
@@ -296,101 +306,87 @@ function Experiment:sync_with_server()
     --   scientist.sync_with_server()
 
     -- Reset internals
-    self.ids_to_param_values.clear()
-    self.ids_to_outcome_values.clear()
-    self.params_to_setting_ids.clear()
+    self.ids_to_param_values = {}
+    self.ids_to_outcome_values = {}
+    self.params_to_setting_ids = {}
 
-    found = false
+    local found = false
 
     if self.experiment_id < 0 then
-        self.experiment_id = self.client.find_experiment(self.experiment)
+        self.experiment_id = self.client:find_experiment(self.experiment)
         if self.experiment_id < 0 then
-            error('Whetlab:ExperimentNotFoundError',...
-                'Experiment with name \"--s\" and description \"--s\" not found.',...
-                 self.experiment, self.experiment_description)
+            enf_error('Experiment with name ' .. self.experimnet .. ' and description ' .. self.experiment_description  ' not found.')
         end
     else
-        details = self.client.get_experiment_details(self.experiment_id)
-        self.experiment = details.('name')
-        self.experiment_description = details.('description')
+        local details = self.client:get_experiment_details(self.experiment_id)
+        self.experiment = details.name
+        self.experiment_description = details.description
     end
 
     -- Get settings for this task, to get the parameter and outcome names
-    rest_parameters = self.client.get_parameters(self.experiment_id)
+    local rest_parameters = self.client:get_parameters(self.experiment_id)
     self.parameters = {}
-    for i = 1:numel(rest_parameters)
+    for i,param = pairs(rest_parameters)
         param = rest_parameters{i}
-        if(param.experiment ~= self.experiment_id) continue end
-        id = param.('id')
-        name = param.('name')
-        vartype=param.('type')
-        minval=param.('min')
-        maxval=param.('max')
-        varsize=param.('size')
-        units=param.('units')
-        scale=param.('scale')
-        isOutput=param.('isOutput')
+        if(param.experiment ~= self.experiment_id) then continue end
+        local id = param.id
+        local name = param.name
+        local vartype=param.type
+        local minval=param.min
+        local maxval=param.max
+        local varsize=param.size
+        local units=param.units
+        local scale=param.scale
+        local isOutput=param.isOutput
 
-        self.params_to_setting_ids.put(name, id)
+        self.params_to_setting_ids[name] = id
 
         if isOutput then
             self.outcome_name = name
         else
-            if ~strcmp(vartype, 'enum') then
-                self.parameters{end+1} = struct('name', name, 'type', vartype,'min',minval,'max',maxval,...
-                             'size', varsize,'isOutput', false, 'units', units,'scale', scale)
-            elseif strcmp(vartype, 'enum') then
-            options = param.('options')
-                self.parameters{end+1} = struct('name', name, 'type', vartype,'min',minval,'max',maxval,...
-                             'size', varsize,'isOutput', false, 'units', units,'scale', scale,'options',options)
+            if vartype ~= 'enum' then
+                self.parameters[name] = {name = name, type = vartype, min = minval, max = maxval,
+                                         size = varsize, isOutput = false, units = units, scale = scale}
+            elseif vartype == 'enum' then
+                options = param.options
+                self.parameters[name] = {name = name, type = vartype, min = minval, max = maxval,
+                                         size = varsize, isOutput = false, units = units, scale = scale, options = options}
             else
-                error('Whetlab:ValueError', ['Type ' vartype ' not supported for variable ' name])
+                value_error('Type ' .. vartype .. ' not supported for variable ' .. name)
             end                    
         end
     end
 
     -- Get results generated so far for this task
-    rest_results = self.client.get_results(self.experiment_id)
+    local rest_results = self.client:get_results(self.experiment_id)
     -- Construct things needed by client internally, to keep track of
     -- all the results
 
-    for i = 1:numel(rest_results)
-        res = rest_results{i}
-        res_id = res.('id')
-        variables = res.('variables')
-        tmp = {}
+    for i, res = pairs(rest_results)
+        local res_id = res.id
+        local variables = res.variables
+        local tmp = {}
 
         -- Construct param_values hash and outcome_values
-        for j = 1:numel(variables)
-            v = variables{j}
+        for j, v = pairs(variables)
 
-            id = v.('id')
-            name = v.('name')                
-            if isequal(name, self.outcome_name) then
+            local id = v.('id')
+            local name = v.('name')                
+            if name == self.outcome_name then
                 -- Anything that's passed back as a string is assumed to be a
                 -- constraint violation.
-                if isstr(v.value) then
-                    v.value = -inf
+                if type(v.value) == 'string' then
+                    v.value = -math.huge
                 end
 
-                -- Don't record the outcome if the experiment is pending
-                if ~isempty(v.value) then
-                    self.ids_to_outcome_values.put(res_id, v.value)
-                else -- Treat NaN as the special indicator that the experiment is pending. We use -INF for constraint violations
-                    self.ids_to_outcome_values.put(res_id, nan)
-                end
+                self.ids_to_outcome_values[res_id] = v.value
             else
-                -- tmp{end+1} = v.('name')
-                -- tmp{end+1} = v.('value')
-                tmp.(v.('name')) = v.('value')
-                self.ids_to_param_values.put(res_id, savejson('',tmp))
+                -- Initialize to empty table if hasn't been created yet
+                if not self.ids_to_param_values[res_id] then self.ids_to_param_values[res_id] = {} end
+                self.ids_to_param_values[res_id][v.name] = v.value
             end
         end
     end
-
-    -- Make sure that everything worked
-    assert(~isempty(self.outcome_name))
-    assert(self.experiment_id >= 0)
 
 end
 
