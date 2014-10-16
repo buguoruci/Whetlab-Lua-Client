@@ -588,7 +588,7 @@ function Experiment:delete()
     --   -- Delete this experiment and all corresponding results.
     --   scientist.delete()
     
-    self.client.delete_experiment(self.experiment_id)
+    self.client:delete_experiment(self.experiment_id)
 end
 
 function Experiment:update(param_values, outcome_val)
@@ -613,6 +613,9 @@ function Experiment:update(param_values, outcome_val)
     --   result = 1.7  
     --   scientist.update(job, result)
     --
+
+    --- I'M HERE!!
+
     if (length(outcome_val) > 1) or ((isstruct(param_values) and length(param_values) > 1)) then
         error('Whetlab:ValueError', 'Update does not accept more than one result at a time')
     end
