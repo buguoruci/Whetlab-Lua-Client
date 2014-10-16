@@ -6,6 +6,13 @@ local default_values = {size = 1, scale = 'linear', units = 'Reals', type = 'flo
 
 local INF_PAGE_SIZE = 1000000
 
+-- A simple helper function to return the number of elements in a table
+function tablelength(T)
+  local count = 0
+  for _ in pairs(T) do count = count + 1 end
+  return count
+end
+
 function read_dot_file()
     vars = {}
     -- Get local .whetlab file
@@ -188,96 +195,78 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
             end
         end
     end
-    --- I'm here
-    if ~strcmp(class(parameters), 'struct') and ~strcmp(class(parameters), 'cell') then
-        error('Whetlab:ValueError', 'Parameters of experiment must be a structure array or a cell array.')
+
+    if type(parameters) ~= "table" then
+        error('Parameters of experiment must be a table.')
     end
 
-    if ~strcmp(class(outcome), 'struct') and ~isempty(fieldnames(outcome)) then
-        error('Whetlab:ValueError', 'Outcome of experiment must be a non-empty struct.')
+    if type(outcome) ~= "table" then
+        error('Outcome of experiment must be a table.')
     end
 
-    if ~isfield(outcome, 'name') then
-        error('Whetlab:ValueError', 'Argument outcome should have a field called: name.')
+    if outcome['name'] == nil then
+        error('Lua:ValueError: Argument outcome should have a field called: name.')
     end
     self.outcome_name = outcome.name
 
     -- Create new experiment
     -- Add specification of parameters
-    settings = {}     
-    for i = 1:numel(parameters)
-        if isstruct(parameters) then
-            param = parameters(i)
-        else -- A cell array
-            param = parameters{i}
-        end
+    settings = {}
+    for name, param in pairs(parameters) do
+        -- Add default parameters if not present
+        if param['type'] == nil then param['type'] = default_values['type'] end
+        if param['type'] == "int" then param['type'] = "integer" end
+        if param['isOutput'] == nil then param['isOutput'] = false end
 
-        if ~isfield(param, 'name') then
-            error('Whetlab:UnnamedParameterError', 'You must specify a name for each parameter.')
-        end
-
-        if ~isfield(param,'type') then param.('type') = self.default_values.type end
-
-        if strcmp(param.type, 'int') then
-            param.('type') = 'integer'
-        end
-
-        if strcmp(param.type, 'enum') then
-            if ~isfield(param, 'options')  or numel(param.options) < 2 then
-                 error('Whetlab:ValueError', ['Parameter ' param.name ' is an enum type which requires the field options with more than one element.'])
-            end
-            -- Add default parameters if not present
-            if ~isfield(param,'isOutput') then param.('isOutput') = false end
+        if param['type'] == 'enum' then
+            if param['options'] == nil or tableLength(param['options']) < 2 then
+                error('Whetlab:ValueError Parameter ' .. name .. ' is an enum type which requires the field options with more than one element.')
+            end        
         else
-            properties = fieldnames(param)
-            for ii = 1:numel(properties)
-                if ~isfield(self.supported_properties, properties{ii}) then
-                    error('Whetlab:ValueError', ['Parameter ' param.name ': property ' properties{ii} ' is not supported.'])
+            for key,v in pairs(param) do
+                if supported_properties[key] == nil then
+                    error('Whetlab:ValueError Parameter ' .. name .. ': property ' .. key .. ' is not supported.')
                 end
             end
 
             -- Check if required properties are present
-            properties = fieldnames(self.required_properties)
-            for ii = 1:numel(properties)
-                if ~isfield(param, properties{ii}) then
-                    error('Whetlab:ValueError', ['Parameter ' param.name ': property ' properties{ii} ' must be defined.'])
+            for key,v in pairs(required_properties) do
+                if param[key] == nil then
+                    error('Whetlab:ValueError Parameter ' .. name .. ': property ' .. key .. ' must be defined.'])
                 end
             end
 
             -- Add default parameters if not present
-            if ~isfield(param,'units') then param.('units') = self.default_values.units end
-            if ~isfield(param,'scale') then param.('scale') = self.default_values.scale end
-            if ~isfield(param,'isOutput') then param.('isOutput') = false end
+            if param['units'] == nil then param['units'] = default_values['units'] end
+            if param['scale'] == nil then param.scale = default_values.scale end
+            if param['isOutput'] == nil then param['isOutput'] = false end
 
             -- Check compatibility of properties
-            if param.('min') >= param.('max') then
-                error('Whetlab:ValueError', ['Parameter ' param.name ': min should be smaller than max.'])
+            if param.min >= param.max then
+                error('Whetlab:ValueError Parameter ' .. name .. ': min should be smaller than max.')
             end
         end
-        settings{i} = param
-
-        f = fieldnames(param)
-        for j = 1:numel(f)
-            self.parameters(i).(f{j}) = param.(f{j})
-        end
+        settings[name] = param
     end
+    self.parameters = settings
 
     -- Add the outcome variable
-    param = struct('units','Reals', 'scale','linear', 'type','float', 'isOutput', true, 'min',-100, 'max', 100, 'size',1)
-    outcome = self.structUpdate(param, outcome)
-    -- outcome = self.structUpdate(settings(end), outcome)
+    param = {'units'='Reals', 'scale'='linear', 'type'='float', 'isOutput'=true, 'min'=-100, 'max'=100, 'size'=1}
+    for k,v in pairs(outcome) do param[k] = v end
+    outcome = param
     outcome.name = self.outcome_name
-    settings{end+1} = outcome    
-    try
-        experiment_id = self.client.create(name, description, settings)
-    catch err
+    settings[outcome.name] = outcome
+
+    -- I'm here
+    success, experiment_id = pcall(self.client:create(name, description, settings))
+    if ~success then
         -- Resume, unless got a ConnectionError
-        if resume and ~strcmp(err.identifier, 'MATLAB:HttpConection:ConnectionError') then
+        if resume and err.identifier, 'MATLAB:HttpConection:ConnectionError') then
             -- This experiment was just already created - race condition.
             self = self.sync_with_server() 
             return
         else
-            rethrow(err)
+            error(experiment_id)
         end
     end
 
@@ -285,13 +274,12 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 
     -- Check if there are pending experiments
     p = self.pending()
-    if length(p) > 0 then
-        disp(sprintf('INFO: this experiment currently has --d jobs (results) that are pending.',length(p)))
+    if tableLength(p) > 0 then
+        printf('INFO: this experiment currently has %d jobs (results) that are pending.',tableLength(p))
     end
-        return self
-
 end -- Experiment()
 
+-- I'm here
 function Experiment:sync_with_server()
     ---- sync_with_server(self)
     --

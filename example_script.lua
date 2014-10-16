@@ -3,7 +3,7 @@
 local os = require("os")
 local json = require("json") -- luajson
 
-api_token = ''
+api_token = '466743aa-69fa-438c-84d8-dbbc42fce09c'
 
 whetlab_client = require('whetlab_api_client')
 client = whetlab_client(api_token, {})
