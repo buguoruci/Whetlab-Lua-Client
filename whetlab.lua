@@ -13,6 +13,31 @@ function tablelength(T)
   return count
 end
 
+-- A simple helper function to compare two tables
+function table_equal(x,y)
+    if type(x) ~= 'table' or type(y) ~= 'table' then
+        return x == y
+    end
+
+    for k,v in pairs(x) do
+        if not table_equal(v,y[k]) then return false end
+    end
+
+    for k,v in pairs(y) do
+        if not table_equal(x[k],v) then return false end
+    end
+    return true
+end
+
+
+
+-- Helper function for sleep
+local clock = os.clock
+function sleep(n)  -- seconds
+  local t0 = clock()
+  while math.abs(clock() - t0) <= n do end
+end
+
 -- Helper function for different types of errors
 
 function value_error(msg)
@@ -158,7 +183,6 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     self.outcome_values        = {}
 
     -- The set of result IDs corresponding to suggested jobs that are pending
-    self.pending_ids           = {}
     self.experiment            = ''
     self.experiment_description= ''
     self.experiment_id = -1
@@ -326,7 +350,7 @@ function Experiment:sync_with_server()
     -- Get settings for this task, to get the parameter and outcome names
     local rest_parameters = self.client:get_parameters(self.experiment_id)
     self.parameters = {}
-    for i,param = pairs(rest_parameters)
+    for i,param in pairs(rest_parameters) do
         param = rest_parameters{i}
         if(param.experiment ~= self.experiment_id) then continue end
         local id = param.id
@@ -362,13 +386,13 @@ function Experiment:sync_with_server()
     -- Construct things needed by client internally, to keep track of
     -- all the results
 
-    for i, res = pairs(rest_results)
+    for i, res in pairs(rest_results) do
         local res_id = res.id
         local variables = res.variables
         local tmp = {}
 
         -- Construct param_values hash and outcome_values
-        for j, v = pairs(variables)
+        for j, v in pairs(variables) do
 
             local id = v.('id')
             local name = v.('name')                
@@ -382,7 +406,7 @@ function Experiment:sync_with_server()
                 self.ids_to_outcome_values[res_id] = v.value
             else
                 -- Initialize to empty table if hasn't been created yet
-                if not self.ids_to_param_values[res_id] then self.ids_to_param_values[res_id] = {} end
+                if self.ids_to_param_values[res_id] == nil then self.ids_to_param_values[res_id] = {} end
                 self.ids_to_param_values[res_id][v.name] = v.value
             end
         end
@@ -410,22 +434,15 @@ function Experiment:pending()
     --   pend = scientist.pending()
 
     -- Sync with the REST server     
-    self = self.sync_with_server()
+    self:sync_with_server()
 
-    -- Find IDs of results with value None and append parameters to returned list
-    i = 1
-    ids = self.ids_to_outcome_values.keySet().toArray()
-    outcomes = self.ids_to_outcome_values.values().toArray()
-    outcomes = arrayfun(@(x)x, outcomes)
-    pend = []
-    for j = 1:length(outcomes)
-        val = outcomes(j)
-        if isnan(val) then
-            ret(i) = loadjson(self.ids_to_param_values.get(ids(j)))
-            i = i + 1
-            pend = ret
-        end
-    end
+    -- Find IDs of results with value nil and append parameters to returned list
+    local i = 1
+    local ret = {}
+    for key,val in pairs(self.ids_to_outcome_values) do
+        if val == nil:
+            ret[i] = self.ids_to_param_values[key]
+    return ret
 end -- pending()
 
 function Experiment:clear_pending()
@@ -447,14 +464,13 @@ function Experiment:clear_pending()
     --   -- Clear all of orphaned pending experiments
     --   scientist.clear_pending()
     
-    jobs = self.pending()
-    if ~isempty(jobs) then
-        for i = 1:numel(jobs)
-            self.cancel(jobs(i))
-        end
+    local jobs = self:pending()
+    for i, job in pairs(jobs) do
+        self:cancel(job)
     end
-    self = self.sync_with_server()
+    self:sync_with_server()
 end        
+
 function Experiment:suggest()
     ---- next = suggest(self)
     -- Suggest a new job.
@@ -480,36 +496,31 @@ function Experiment:suggest()
     --   -- Get a new experiment to run.
     --   job = scientist.suggest()
     
-    self.sync_with_server()
-    result_id = self.client.get_suggestion(self.experiment_id)
-    
-    -- Remember that this job is now assumed to be pending
-    self.pending_ids(end+1) = result_id
+    self:sync_with_server()
+    local result_id = self.client:get_suggestion(self.experiment_id)
     
     -- Poll the server for the actual variable values in the suggestion.  
     -- Once the Bayesian optimization proposes an
     -- experiment, the server will fill these in.
-    result = self.client.get_result(result_id)
-    variables = result.variables
-    while isempty(variables)
-        pause(2)
-        result = self.client.get_result(result_id)
+    local result = self.client:get_result(result_id)
+    local variables = result.variables
+    while variables == nil
+        sleep(2)
+        result = self.client:get_result(result_id)
         variables = result.variables
     end
     
     -- Put in a nicer format
-    -- next = {}
-    for i = 1:numel(variables)
-        if ~strcmp(variables{i}.name, self.outcome_name) then
-            next.(variables{i}.name) = variables{i}.value
-            -- next{end+1} = variables{i}.name
-            -- next{end+1} = variables{i}.value
+    local next = {}
+    for i, variable in pairs(variables) do
+        if variable.name ~= self.outcome_name then
+            next[variable.name] = variable.value
         end
     end        
 
     -- Keep track of id / param_values relationship
-    self.ids_to_param_values.put(result_id, savejson('',next))
-    next.('result_id_') = result_id
+    self.ids_to_param_values[result_id] = next
+    next.result_id_ = result_id
 end -- suggest
 
 function Experiment:get_id(param_values)
@@ -543,21 +554,20 @@ function Experiment:get_id(param_values)
     -- end
 
     -- First sync with the server
-    self = self.sync_with_server()
+    self = self:sync_with_server()
 
     -- Remove key result_id_ if present
-    if isfield(param_values,'result_id_') then
-        param_values = rmfield(param_values,'result_id_')
+    if param_values.result_id_ ~= nil then
+        param_values.result_id_ = nil
     end
 
-    id = -1
-    keys = self.ids_to_param_values.keySet().toArray
-    for i = 1:numel(keys)
-        if isequal(savejson('', param_values), self.ids_to_param_values.get(keys(i))) then
-            id = keys(i)
-            break
+    local id = -1
+    for id, pv in pairs(self.ids_to_param_values) do
+        if table_equal(param_values, pv) then
+            return id
         end
     end
+    return id
 end -- get_id
 
 function Experiment:delete()
@@ -620,7 +630,7 @@ function Experiment:update(param_values, outcome_val)
 
         -- Create variables for new result
         param_names = self.params_to_setting_ids.keySet().toArray()
-        for i = 1:numel(param_names)
+        for i = 1:numel(param_names) do
             name = param_names(i)
             setting_id = self.params_to_setting_ids.get(name)
             if isfield(param_values, name) then
@@ -649,7 +659,7 @@ function Experiment:update(param_values, outcome_val)
     else
         result = self.client.get_result(result_id)
 
-        for i = 1:numel(result.variables)
+        for i = 1:numel(result.variables) do
             var = result.variables{i}
             if strcmp(var.('name'), self.outcome_name) then
                 -- Convert the outcome to a constraint violation if it's not finite
@@ -669,8 +679,6 @@ function Experiment:update(param_values, outcome_val)
         self.param_values.put(result_id, savejson('',result))
         self.client.update_result(result_id, result)
 
-        -- Remove this job from the pending list
-        self.pending_ids(self.pending_ids == result_id) = []
     end
     self.ids_to_outcome_values.put(result_id, outcome_val)
 end --update
@@ -703,9 +711,6 @@ function Experiment:cancel(param_values)
             self.ids_to_outcome_values.remove(id)
         end
             
-        -- Remove this job from the pending list if it's there.
-        self.pending_ids(self.pending_ids == id) = []
-
         -- Delete from server
         self.client.delete_result(id)
     else
@@ -744,7 +749,7 @@ function Experiment:best()
 
     -- Get param values that generated this outcome
     result = self.client.get_result(result_id)
-    for i = 1:numel(result.('variables'))
+    for i = 1:numel(result.('variables')) do
         v = result.('variables'){i}
         if ~strcmp(v.name, self.outcome_name) then
             param_values.(v.name) = v.value
