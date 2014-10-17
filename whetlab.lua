@@ -177,7 +177,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     --   outcome = {}
     --   outcome.name = 'Accuracy'
     --
-    --   scientist = whetlab(name, description, parameters, outcome, true)
+    --   scientist = whetlab(name, description, parameters, outcome, true, access_token)
 
     local self = setmetatable({},Experiment)
 
@@ -342,9 +342,9 @@ function Experiment:sync_with_server()
     -- Example usage::
     --
     --   -- Create a new experiment 
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   scientist.sync_with_server()
@@ -473,9 +473,9 @@ function Experiment:pending()
     -- Example usage::
     --
     --   -- Create a new experiment
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   -- Get the list of pending experiments
@@ -505,9 +505,9 @@ function Experiment:clear_pending()
     -- Example usage::
     --
     --   -- Create a new experiment
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   -- Clear all of orphaned pending experiments
@@ -537,9 +537,9 @@ function Experiment:suggest()
     -- Example usage::
     --
     --   -- Create a new experiment
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   -- Get a new experiment to run.
@@ -587,9 +587,9 @@ function Experiment:get_id(param_values)
     -- Example usage::
     --
     --   -- Create a new experiment
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   -- Get a new experiment to run
@@ -625,9 +625,9 @@ function Experiment:delete()
     -- Example usage::
     --
     --   -- Create a new experiment
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   -- Delete this experiment and all corresponding results.
@@ -769,9 +769,9 @@ function Experiment:best()
     -- Example usage::
     --
     --   -- Create a new experiment
-    --   scientist = whetlab(name,...
-    --               description,...
-    --               parameters,...
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
     --               outcome, true, access_token)
     --
     --   -- Get the best job seen so far.
