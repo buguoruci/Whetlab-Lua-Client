@@ -125,63 +125,60 @@ Experiment.__index = Experiment
 setmetatable(Experiment, { __call = function (cls, ...) return cls.new(...) end})
 
 function Experiment.new(name, description, parameters, outcome, resume, access_token)
-    --[[--
-    Experiment(name, description, parameters, outcome, resume, access_token)
-    
-    Instantiate a Whetlab client.
-    This client allows you to manipulate experiments in Whetlab
-    and interact with the Whetlab server.
-    
-    A name and description for the experiment must be specified.
-    A Whetlab access token must also be provided.
-    The parameters to tune in the experiment are specified by
-    ``parameters``. It should be a ``table``, where the keys are
-    the parameters (``str``) and values are ``table``s that
-    provide information about these parameters. Each of these
-    ``table`` should contain the appropriate keys to properly describe
-    the parameter:
-    
-    * **type**: type of the parameter, among ``float``, ``int`` and ``enum``(default: ``float``)
-    * **min**: minimum value of the parameter (only for types ``float`` and ``int``)
-    * **max**: maximum value of the parameter (only for types ``float`` and ``int``)
-    * **options**: cell of strings, of the possible values that can take an ``enum`` parameter (only for type ``enum``)
-    * **size**: size of parameter (default: ``1``)
-    
-    Outcome should also be a ``table``, describing the outcome. It
-    should have the field:
-    
-    * *name*: name (``str``) for the outcome being optimized
-    
-    Finally, experiments can be resumed from a previous state.
-    To do so, ``name`` must match a previously created experiment
-    and argument ``resume`` must be set to ``True`` (default is ``False``).
-    
-    * *name* (str): Name of the experiment.
-    * *description* (str): Description of the experiment.
-    * *parameters* (table): Parameters to be tuned during the experiment.
-    * *outcome* (table): Description of the outcome to maximize.
-    * *resume* (boolean): Whether to resume a previously executed experiment. If ``True`` and experiment's name matches an existing experiment, ``parameters`` and ``outcome`` are ignored (default: ``None``).
-    * *access_token* (str): Access token for your Whetlab account. If ``''``, then is read from whetlab configuration file (default: ``''``).
-    
-    A Whetlab experiment instance will have the following variables:
-    
-    * *parameters* (table): Parameters to be tuned during the experiment.
-    * *outcome* (table): Description of the outcome to maximize.
-    
-    Example usage::
-    
-      -- Create a new experiment
-      name = 'A descriptive name'
-      description = 'The description of the experiment'
-      parameters = {Lambda = {type = 'float', min = 1e-4, max = 0.75, size = 1},
-                    Alpha = {type = 'float', min = 1e-4, max = 1, size = 1}}
-      outcome = {}
-      outcome.name = 'Accuracy'
-    
-      scientist = whetlab(name, description, parameters, outcome, true)
+    -- whetlab(name, description, parameters, outcome, resume, access_token)
+    --
+    -- Instantiate a Whetlab client.
+    -- This client allows you to manipulate experiments in Whetlab
+    -- and interact with the Whetlab server.
+    --
+    -- A name and description for the experiment must be specified.
+    -- A Whetlab access token must also be provided.
+    -- The parameters to tune in the experiment are specified by
+    -- ``parameters``. It should be a ``table``, where the keys are
+    -- the parameters (``str``) and values are ``table``s that
+    -- provide information about these parameters. Each of these
+    -- ``table`` should contain the appropriate keys to properly describe
+    -- the parameter:
+    --
+    -- * **type**: type of the parameter, among ``float``, ``int`` and ``enum``(default: ``float``)
+    -- * **min**: minimum value of the parameter (only for types ``float`` and ``int``)
+    -- * **max**: maximum value of the parameter (only for types ``float`` and ``int``)
+    -- * **options**: cell of strings, of the possible values that can take an ``enum`` parameter (only for type ``enum``)
+    -- * **size**: size of parameter (default: ``1``)
+    --
+    -- Outcome should also be a ``table``, describing the outcome. It
+    -- should have the field:
+    --
+    -- * *name*: name (``str``) for the outcome being optimized
+    --
+    -- Finally, experiments can be resumed from a previous state.
+    -- To do so, ``name`` must match a previously created experiment
+    -- and argument ``resume`` must be set to ``True`` (default is ``False``).
+    --
+    -- * *name* (str): Name of the experiment.
+    -- * *description* (str): Description of the experiment.
+    -- * *parameters* (table): Parameters to be tuned during the experiment.
+    -- * *outcome* (table): Description of the outcome to maximize.
+    -- * *resume* (boolean): Whether to resume a previously executed experiment. If ``True`` and experiment's name matches an existing experiment, ``parameters`` and ``outcome`` are ignored (default: ``None``).
+    -- * *access_token* (str): Access token for your Whetlab account. If ``''``, then is read from whetlab configuration file (default: ``''``).
+    --
+    -- A Whetlab experiment instance will have the following variables:
+    --
+    -- * *parameters* (table): Parameters to be tuned during the experiment.
+    -- * *outcome* (table): Description of the outcome to maximize.
+    --
+    -- Example usage::
+    --
+    --   -- Create a new experiment
+    --   name = 'A descriptive name'
+    --   description = 'The description of the experiment'
+    --   parameters = {Lambda = {type = 'float', min = 1e-4, max = 0.75, size = 1},
+    --                 Alpha = {type = 'float', min = 1e-4, max = 1, size = 1}}
+    --   outcome = {}
+    --   outcome.name = 'Accuracy'
+    --
+    --   scientist = whetlab(name, description, parameters, outcome, true)
 
-    --]]--
-    
     local self = setmetatable({},Experiment)
 
     -- ... From result IDs to client parameter values
@@ -338,7 +335,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 end -- Experiment()
 
 function Experiment:sync_with_server()
-    ---- sync_with_server(self)
+    ---- sync_with_server()
     --
     -- Synchronize the client's internals with the REST server.
     --
@@ -391,9 +388,7 @@ function Experiment:sync_with_server()
             enf_error('Experiment with name ' .. self.experiment .. ' and description ' .. self.experiment_description  .. ' not found.')
         end
     else
-        -- local details = self.client:get_experiment_details(self.experiment_id)
         details = self.client:experiments():get({query={id=experiment_id}})['results']        
-        -- local details = res{1};
 
         self.experiment = details.name
         self.experiment_description = details.description
@@ -468,12 +463,12 @@ function Experiment:sync_with_server()
 end
 
 function Experiment:pending()
-    ---- pend = pending(self)
+    ---- pend = pending()
     -- Return the list of jobs which have been suggested, but for which no 
     -- result has been provided yet.
     --
-    -- * *returns:* Struct array of parameter values.
-    -- * *return type:* struct array
+    -- * *returns:* array of parameter values.
+    -- * *return type:* array
     -- 
     -- Example usage::
     --
@@ -500,7 +495,7 @@ function Experiment:pending()
 end -- pending()
 
 function Experiment:clear_pending()
-    ---- clear_pending(self)
+    ---- clear_pending()
     -- Delete all of the jobs which have been suggested but for which no 
     -- result has been provided yet (i.e. pending jobs).
     --
@@ -526,18 +521,18 @@ function Experiment:clear_pending()
 end        
 
 function Experiment:suggest()
-    ---- next = suggest(self)
+    ---- next = suggest()
     -- Suggest a new job.
     -- 
     -- This function sends a request to Whetlab to suggest a new
     -- experiment to run.  It may take some time to return while waiting
     -- for the suggestion to complete on the server.
     --
-    -- This function returns struct containing parameter names and 
+    -- This function returns a table containing parameter names and 
     -- corresponding values detailing a new experiment to be run.
     --
     -- * *returns:* Values to assign to the parameters in the suggested job.
-    -- * *return type:* struct
+    -- * *return type:* table
     --
     -- Example usage::
     --
@@ -581,11 +576,11 @@ function Experiment:suggest()
 end -- suggest
 
 function Experiment:get_id(param_values)
-    ---- id = get_id(self, param_values)
+    ---- id = get_id(param_values)
     -- Return the result ID corresponding to the given _param_values_.
     -- If no result matches, return -1.
     --
-    -- * *param_values* (struct): Values of parameters.
+    -- * *param_values* (table): Names->Values of parameters.
     -- * *returns:* ID of the corresponding result. If not match, -1 is returned.
     -- * *return type:* int or -1
     --
@@ -602,13 +597,6 @@ function Experiment:get_id(param_values)
     --   
     --   -- Get the corresponding experiment id.
     --   id = scientist.get_id(job)
-    
-    
-    -- Convert to a cell array if params are specified as a struct.
-    -- Cell arrays allow for spaces in the param names.
-    -- if isstruct(param_values)
-    --     param_values = whetlab.struct_2_cell_params(param_values)
-    -- end
 
     -- First sync with the server
     self = self:sync_with_server()
@@ -628,7 +616,7 @@ function Experiment:get_id(param_values)
 end -- get_id
 
 function Experiment:delete()
-    ---- delete(self)
+    ---- delete()
     --
     -- Delete this experiment.  
     --
@@ -657,8 +645,8 @@ function Experiment:update(param_values, outcome_val)
     -- correspond to an experiment suggested by Whetlab or an
     -- independently run (user proposed) experiment.
     --
-    -- * *param* param_values: Values of parameters.
-    -- * *type* param_values: struct
+    -- * *param* param_values: Names->Values of parameters.
+    -- * *type* param_values: table
     -- * *param* outcome_val: Value of the outcome.
     -- * *type* outcome_val: type defined for outcome
     -- 
@@ -742,7 +730,7 @@ function Experiment:cancel(param_values)
     ---- cancel(param_values)
     -- Cancel a job, by removing it from the jobs recorded so far in the experiment.
     --
-    -- * *param_values* (struct): Values of the parameters for the job to cancel.
+    -- * *param_values* (table): Names->Values of the parameters for the job to cancel.
     --
     -- Example usage::
     -- 
@@ -776,7 +764,7 @@ function Experiment:best()
     -- Return the job with best outcome found so far.        
     --
     -- * *returns:* Parameter values corresponding to the best outcome.
-    -- * *return type:* struct
+    -- * *return type:* table
     --
     -- Example usage::
     --
