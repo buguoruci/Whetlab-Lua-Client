@@ -125,7 +125,7 @@ Experiment.__index = Experiment
 setmetatable(Experiment, { __call = function (cls, ...) return cls.new(...) end})
 
 function Experiment.new(name, description, parameters, outcome, resume, access_token)
-    -- whetlab(name, description, parameters, outcome, resume, access_token)
+    ---- whetlab(name, description, parameters, outcome, resume, access_token)
     --
     -- Instantiate a Whetlab client.
     -- This client allows you to manipulate experiments in Whetlab
