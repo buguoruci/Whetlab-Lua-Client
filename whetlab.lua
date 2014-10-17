@@ -116,8 +116,7 @@ end
 
 local Experiment = {}
 Experiment.__index = Experiment
-setmetatable(Experiment, { __call = function (cls, ...) return cls.new(...) end, ) })
-
+setmetatable(Experiment, { __call = function (cls, ...) return cls.new(...) end})
 
 function Experiment.new(name, description, parameters, outcome, resume, access_token)
     --[[--
@@ -223,7 +222,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     -- Create REST server client
     local hostname = vars.api_url or 'https://www.whetlab.com/'
 
-    self.client = SimpleREST(access_token, hostname, retries)
+    self.client = whetlab_client(api_token, {})
 
     self.experiment_description = description
     self.experiment = name
@@ -232,7 +231,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     if resume then
         -- Try to resume if the experiment exists. If it doesn't exist, we'll create it.
         self.experiment_id = experiment_id
-        status, err = pcall(self:sync_with_server)
+        status, err = pcall(self.sync_with_server)
         if status then
             print('Resuming experiment ' .. self.experiment)
         else
@@ -278,7 +277,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
             -- Check if required properties are present
             for key,v in pairs(required_properties) do
                 if param[key] == nil then
-                    value_error('Parameter ' .. name .. ': property ' .. key .. ' must be defined.'])
+                    value_error('Parameter ' .. name .. ': property ' .. key .. ' must be defined.')
                 end
             end
 
@@ -297,7 +296,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     self.parameters = settings
 
     -- Add the outcome variable
-    param = {'units'='Reals', 'scale'='linear', 'type'='float', 'isOutput'=true, 'min'=-100, 'max'=100, 'size'=1}
+    param = {units='Reals', scale='linear', type='float', isOutput=true, min=-100, max=100, size=1}
     for k,v in pairs(outcome) do param[k] = v end
     outcome = param
     outcome.name = self.outcome_name
@@ -306,7 +305,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     status, res = pcall(function () return self.client:experiments():create(name, description, settings) end)
     if not status then
         -- Resume, unless got a ConnectionError
-        if resume and res ~= '???Whetlab:ExperimentExists?????') then
+        if resume and (res ~= '???Whetlab:ExperimentExists?????') then
             -- This experiment was just already created - race condition.
             self:sync_with_server()
             return
@@ -355,8 +354,8 @@ function Experiment:sync_with_server()
         more_pages = true
         experiment_id = -1
         found = false
-        while more_pages
-            rest_exps = self.client:experiments():get({'query'={'page'=page}}).body
+        while more_pages do
+            rest_exps = self.client:experiments():get({query={page=page}}).body
         
             -- Check if more pages to come
             more_pages = rest_exps['next'] ~= nil
@@ -371,7 +370,7 @@ function Experiment:sync_with_server()
                     break
                 end
             end
-            if found
+            if found then
                 break
             end
         end
@@ -386,12 +385,12 @@ function Experiment:sync_with_server()
     end
 
     -- Get settings for this task, to get the parameter and outcome names
-    local rest_parameters = self.client:settings():get(tostring(experiment_id), {'query'={'page_size'=self.INF_PAGE_SIZE}}).body.results
+    local rest_parameters = self.client:settings():get(tostring(experiment_id), {query={page_size=self.INF_PAGE_SIZE}}).body.results
 
     self.parameters = {}
     for i,param in pairs(rest_parameters) do
         param = rest_parameters{i}
-        if(param.experiment ~= self.experiment_id) then continue end
+        -- if (param.experiment ~= self.experiment_id) then continue end
         local id = param.id
         local name = param.name
         local vartype=param.type
@@ -421,7 +420,7 @@ function Experiment:sync_with_server()
     end
 
     -- Get results generated so far for this task
-    local rest_results = self.client:results():get({'query'={'experiment'=experiment_id,'page_size'=self.INF_PAGE_SIZE}}).body.results
+    local rest_results = self.client:results():get({query={experiment=experiment_id, page_size=self.INF_PAGE_SIZE}}).body.results
     -- Construct things needed by client internally, to keep track of
     -- all the results
 
@@ -433,8 +432,8 @@ function Experiment:sync_with_server()
         -- Construct param_values hash and outcome_values
         for j, v in pairs(variables) do
 
-            local id = v.('id')
-            local name = v.('name')                
+            local id = v.id
+            local name = v.name
             if name == self.outcome_name then
                 -- Anything that's passed back as a string is assumed to be a
                 -- constraint violation.
@@ -479,8 +478,10 @@ function Experiment:pending()
     local i = 1
     local ret = {}
     for key,val in pairs(self.ids_to_outcome_values) do
-        if val == nil:
+        if val == nil then
             ret[i] = self.ids_to_param_values[key]
+        end
+    end
     return ret
 end -- pending()
 
@@ -546,7 +547,7 @@ function Experiment:suggest()
     local result = client:result(resid):get()
     variables = result['variables']
 
-    while next(variables) == nil
+    while next(variables) == nil do
         sleep(2)
         result = client:result(resid):get()
         variables = result['variables']
@@ -561,7 +562,7 @@ function Experiment:suggest()
     end
 
     -- Keep track of id / param_values relationship
-    self.ids_to_param_values[result_id] = next
+    self.ids_to_param_values[result_id] = next_var
     next.result_id_ = result_id
 end -- suggest
 
@@ -700,16 +701,16 @@ function Experiment:update(param_values, outcome_val)
 
         self.ids_to_param_values[result_id] = param_values
     else
-        result = self.client:results():get({'query'={'experiment'=experiment_id,'page_size'=self.INF_PAGE_SIZE}}).body['results']
+        result = self.client:results():get({query={experiment=experiment_id, page_size=self.INF_PAGE_SIZE}}).body['results']
         for i, var in pairs(result.variables) do
             if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
                 -- This is needed to send the JSON in a manner that will be parsed
                 -- correctly server-side.
-                result.variables{i}.('value') = outcome_val
+                result.variables[i]['value'] = outcome_val
                 if isnan(outcome_val) then
                     result.variables[i]['value'] = 'NaN'
-                elseif ~isfinite(outcome_val) then
+                elseif isinf(outcome_val) then
                     result.variables[i]['value'] = '-infinity'
                 end
                 self.outcome_values[result_id] = var
