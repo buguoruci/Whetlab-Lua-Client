@@ -1,4 +1,4 @@
-local https = require('ssl.https')
+local https = require('ssl.https') -- luasec
 local json = require("json") -- luajson
 local ltn12 = require("ltn12")
 

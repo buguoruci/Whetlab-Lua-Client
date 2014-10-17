@@ -1,5 +1,7 @@
 
-client = require("whetlab_api.whetlab_api_client")
+client = require("api.whetlab_api.whetlab_api_client")
+os     = require("os")
+io     = require("io")
 
 -- Validation things
 local supported_properties = {'isOutput', 'name', 'min', 'max', 'size', 'scale', 'units', 'type'}
@@ -63,10 +65,11 @@ end
 function read_dot_file()
     vars = {}
     -- Get local .whetlab file
-    local fid = io.open('.whetlab','r')
+    local fid = io.open('.whetlab', 'r')
 
     -- If can't get .whetlab file, get ~/.whetlab
-    if not fid then fid = io.open('~/.whetlab','r') end
+    fname = os.getenv( "HOME" ) .. '/.whetlab'
+    if not fid then fid = io.open(fname, 'r') end
 
     if not fid then
         return vars
@@ -76,13 +79,15 @@ function read_dot_file()
       return s:gsub("^%s+", ""):gsub("%s+$", "")
     end
 
-    for line in fid.lines() do
+    for line in fid:lines() do
         if line:len() ~= 0 and line:sub(1,1) ~= '#' and line:sub(1,1) ~= '%' then
             -- Split into key and value
             pos_equal = line:find('=')
-            key = trim(line:sub(1,pos_equal-1))
-            val = trim(line:sub(pos_equal+1))
-            vars[key] = val
+            if pos_equal ~= nil then
+                key = trim(line:sub(1,pos_equal-1))
+                val = trim(line:sub(pos_equal+1))
+                vars[key] = val
+            end
         end
     end
 
@@ -799,4 +804,5 @@ function Experiment:best()
         end
     end
 end -- best
-    
+
+return Experiment
