@@ -1,4 +1,6 @@
 
+client = require("whetlab_api.whetlab_api_client")
+
 -- Validation things
 local supported_properties = {'isOutput', 'name', 'min', 'max', 'size', 'scale', 'units', 'type'}
 local required_properties = {'min', 'max'}
@@ -301,18 +303,18 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     outcome.name = self.outcome_name
     settings[outcome.name] = outcome
 
-    status, err = pcall(function () return self.client:create(name, description, settings) end)
+    status, res = pcall(function () return self.client:experiments():create(name, description, settings) end)
     if not status then
         -- Resume, unless got a ConnectionError
-        if resume and err ~= '???Whetlab:ExperimentExists?????') then
+        if resume and res ~= '???Whetlab:ExperimentExists?????') then
             -- This experiment was just already created - race condition.
             self:sync_with_server()
             return
         else
-            error(err)
+            error(res)
         end
     else
-        experiment_id = err
+        experiment_id = res.body['id']
     end
 
     self.experiment_id = experiment_id
