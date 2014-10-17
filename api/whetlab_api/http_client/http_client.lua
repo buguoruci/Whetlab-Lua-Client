@@ -10,7 +10,6 @@ local function construct(objname, auth, options)
     if type(auth) == "string" then
         self.auth = auth
     else
-        print(type(auth))
         error('Only string based authentication tokens are supported.')
     end
 
@@ -94,11 +93,6 @@ end
 -- - Returns response body after parsing it into correct format
 function http_client:request(path, body, method, options)
 
-    -- print(path)
-    -- print(body)
-    -- print(method)
-    -- print(options)
-
     for key,value in pairs(options) do
         options[key] = value
     end
@@ -147,13 +141,11 @@ function http_client:request(path, body, method, options)
                 if params ~= nil then
                     -- Convert parameters to a url encoded string
                     for key,value in pairs(params) do
-                        print(key,value)
                         paramString = paramString .. self:url_encode(key) .. '=' .. self:url_encode(value) .. '&'
                     end
                 end
             else
                 paramString = json.encode(body)
-                print(paramString)
                 source = ltn12.source.string(paramString)
                 jsonsize = # paramString
                 heads["content-length"] = jsonsize
@@ -188,7 +180,6 @@ function http_client:request(path, body, method, options)
 
     if method == 'get' then        
         url = url .. '?' .. paramString
-        print(url)
         ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
     else
         ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
@@ -200,9 +191,6 @@ function http_client:request(path, body, method, options)
         response = nil
     end
 
-    print(code)
-    print(response)
-
     -- Success
     if tonumber(code) > 199 and tonumber(code) < 300 then
         if response ~= nil then
@@ -211,7 +199,7 @@ function http_client:request(path, body, method, options)
             result = nil
         end
     else
-        error('ClientError: ' .. response)
+        error('ClientError code:' .. code .. ' message: ' .. response)
     end
 
     --- show that we got a valid response

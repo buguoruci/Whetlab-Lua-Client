@@ -11,7 +11,7 @@ local default_values = {size = 1, scale = 'linear', units = 'Reals', type = 'flo
 local INF_PAGE_SIZE = 1000000
 
 -- A simple helper function to return the number of elements in a table
-function tablelength(T)
+function table_length(T)
   local count = 0
   for _ in pairs(T) do count = count + 1 end
   return count
@@ -236,13 +236,12 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     self.experiment = name
     self.outcome_name = outcome.name
     if resume then
-        print("exptid", self.experiment_id)
         -- Try to resume if the experiment exists. If it doesn't exist, we'll create it.
-        status, err = pcall(self:sync_with_server())
+        status, err = pcall(self.sync_with_server, self)
         if status then
             print('Resuming experiment ' .. self.experiment)
         else
-            if not err:find('Whetlab:ExperimentNotFoundError:') then
+            if not err:find('404') then
                 error(err)
             end
         end
@@ -271,7 +270,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
         if param['isOutput'] == nil then param['isOutput'] = false end
 
         if param['type'] == 'enum' then
-            if param['options'] == nil or tableLength(param['options']) < 2 then
+            if param['options'] == nil or table_length(param['options']) < 2 then
                 value_error('Parameter ' .. name .. ' is an enum type which requires the field options with more than one element.')
             end        
         else
@@ -301,6 +300,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
         end
         table.insert(settings, param)
     end
+
     self.parameters = settings
 
     -- Add the outcome variable
@@ -312,14 +312,12 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
 
     -- Actually create the experiment
     status, res = pcall(function () return self.client:experiments():create(name, description, settings) end)
-    print(status)
-    print("res", res)
     if not status then
         -- Resume, unless got a ConnectionError
         if resume and (res ~= '???Whetlab:ExperimentExists?????') then
             -- This experiment was just already created - race condition.
             self:sync_with_server()
-            return
+            return self
         else
             error(res)
         end
@@ -328,12 +326,15 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     self.experiment_id = experiment_id
-    print("experiment id", self.experiment_id)
+
     -- Check if there are pending experiments
     p = self:pending()
-    if tableLength(p) > 0 then
-        print('INFO: this experiment currently has %d jobs (results) that are pending.' .. tableLength(p))
+    if table_length(p) > 0 then
+        print('INFO: this experiment currently has %d jobs (results) that are pending.' .. table_length(p))
     end
+
+    return self
+
 end -- Experiment()
 
 function Experiment:sync_with_server()
@@ -368,8 +369,6 @@ function Experiment:sync_with_server()
         while more_pages do
             rest_exps = self.client:experiments():get({query={page=page}})
         
-            print('rest_exps', rest_exps)
-
             -- Check if more pages to come
             more_pages = rest_exps['next'] ~= nil
             page = page + 1
@@ -378,7 +377,7 @@ function Experiment:sync_with_server()
             rest_exps = rest_exps.results
             for i, expt in pairs(rest_exps) do
                 if expt.name  == name then
-                    experiment_id = expt.id
+                    self.experiment_id = expt['id']
                     found = true
                     break
                 end
@@ -392,20 +391,20 @@ function Experiment:sync_with_server()
             enf_error('Experiment with name ' .. self.experiment .. ' and description ' .. self.experiment_description  .. ' not found.')
         end
     else
-        local details = self.client:get_experiment_details(self.experiment_id)
-        res = self.client:experiments():get({query={id=experiment_id}}).body['results']
-        local details = res{1};
+        -- local details = self.client:get_experiment_details(self.experiment_id)
+        details = self.client:experiments():get({query={id=experiment_id}})['results']        
+        -- local details = res{1};
 
         self.experiment = details.name
         self.experiment_description = details.description
     end
+    experiment_id = self.experiment_id
 
     -- Get settings for this task, to get the parameter and outcome names
-    local rest_parameters = self.client:settings():get(tostring(experiment_id), {query={page_size=self.INF_PAGE_SIZE}}).body.results
+    local rest_parameters = self.client:settings():get(tostring(experiment_id), {query={page_size=INF_PAGE_SIZE}}).results
 
     self.parameters = {}
     for i,param in pairs(rest_parameters) do
-        param = rest_parameters{i}
         -- if (param.experiment ~= self.experiment_id) then continue end
         local id = param.id
         local name = param.name
@@ -436,7 +435,7 @@ function Experiment:sync_with_server()
     end
 
     -- Get results generated so far for this task
-    local rest_results = self.client:results():get({query={experiment=experiment_id, page_size=self.INF_PAGE_SIZE}}).body.results
+    local rest_results = self.client:results():get({query={experiment=self.experiment_id, page_size=self.INF_PAGE_SIZE}}).results
     -- Construct things needed by client internally, to keep track of
     -- all the results
 
@@ -465,7 +464,7 @@ function Experiment:sync_with_server()
             end
         end
     end
-
+    return true
 end
 
 function Experiment:pending()
@@ -491,11 +490,10 @@ function Experiment:pending()
     self:sync_with_server()
 
     -- Find IDs of results with value nil and append parameters to returned list
-    local i = 1
     local ret = {}
     for key,val in pairs(self.ids_to_outcome_values) do
         if val == nil then
-            ret[i] = self.ids_to_param_values[key]
+            table.insert(ret, self.ids_to_param_values[key])
         end
     end
     return ret
@@ -553,19 +551,18 @@ function Experiment:suggest()
     --   job = scientist.suggest()
     
     self:sync_with_server()
-    res = self.client:suggest(tostring(experiment_id)).go()
-    res = res.body
+    res = self.client:suggest(tostring(experiment_id)):go()
     local result_id = res['id']
 
     -- Poll the server for the actual variable values in the suggestion.  
     -- Once the Bayesian optimization proposes an
     -- experiment, the server will fill these in.
-    local result = client:result(resid):get()
+    local result = self.client:result(result_id):get()
     variables = result['variables']
 
     while next(variables) == nil do
         sleep(2)
-        result = client:result(resid):get()
+        result = self.client:result(result_id):get()
         variables = result['variables']
     end
     
@@ -579,7 +576,8 @@ function Experiment:suggest()
 
     -- Keep track of id / param_values relationship
     self.ids_to_param_values[result_id] = next_var
-    next.result_id_ = result_id
+    next_var.result_id_ = result_id
+    return next_var
 end -- suggest
 
 function Experiment:get_id(param_values)
@@ -673,9 +671,6 @@ function Experiment:update(param_values, outcome_val)
     --   result = 1.7  
     --   scientist.update(job, result)
     --
-
-    --- I'M HERE!!
-
     if type(outcome_val) ~= "number" then
         value_error('The outcome value must be a number')
     end
@@ -684,7 +679,7 @@ function Experiment:update(param_values, outcome_val)
         result_id = param_values['result_id_']
     else
         -- Check whether this param_values has a result ID
-        result_id = self.get_id(param_values)
+        result_id = self:get_id(param_values)
     end
 
     if result_id == nil or result_id == -1 then
@@ -717,27 +712,31 @@ function Experiment:update(param_values, outcome_val)
 
         self.ids_to_param_values[result_id] = param_values
     else
-        result = self.client:results():get({query={experiment=experiment_id, page_size=self.INF_PAGE_SIZE}}).body['results']
-        for i, var in pairs(result.variables) do
-            if var.name == self.outcome_name then
-                -- Convert the outcome to a constraint violation if it's not finite
-                -- This is needed to send the JSON in a manner that will be parsed
-                -- correctly server-side.
-                result.variables[i]['value'] = outcome_val
-                if isnan(outcome_val) then
-                    result.variables[i]['value'] = 'NaN'
-                elseif isinf(outcome_val) then
-                    result.variables[i]['value'] = '-infinity'
+        results = self.client:results():get({query={experiment=experiment_id, page_size=INF_PAGE_SIZE}})['results']
+
+        for j, result in pairs(results) do
+            for i, var in pairs(result.variables) do
+                if var.name == self.outcome_name then
+                    -- Convert the outcome to a constraint violation if it's not finite
+                    -- This is needed to send the JSON in a manner that will be parsed
+                    -- correctly server-side.
+                    newresult = result
+                    newresult.variables[i]['value'] = outcome_val
+                    if isnan(outcome_val) then
+                        newresult.variables[i]['value'] = 'NaN'
+                    elseif isinf(outcome_val) then
+                        newresult.variables[i]['value'] = '-infinity'
+                    end
+                    self.outcome_values[result_id] = var
+                    break -- Assume only one outcome per experiment!
                 end
-                self.outcome_values[result_id] = var
-                break -- Assume only one outcome per experiment!
             end
         end
+        self.param_values[result_id] = newresult
 
-        self.param_values[result_id] = result
         res = self.client:result(tostring(result_id)):update(
-            result.variables, result.experiment, result.userProposed,
-            result.description, result.createdDate, result.id)
+            newresult.variables, newresult.experiment, newresult.userProposed,
+            newresult.description, newresult.createdDate, newresult.id)
     end
     self.ids_to_outcome_values[result_id] = outcome_val
 end --update
@@ -794,7 +793,7 @@ function Experiment:best()
     --   best = scientist.best()
 
     -- Sync with the REST server
-    self.sync_with_server()
+    self:sync_with_server()
 
     -- Find ID of result with best outcome
     bestid = -1

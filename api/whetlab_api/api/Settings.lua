@@ -10,7 +10,7 @@ setmetatable(Settings, {__call = construct})
 -- '/alpha/settings/' GET
 --
 -- experiment - Experiment id to filter by.
-function Settings:get(self, experiment, options)
+function Settings:get(experiment, options)
     body = {}
     if options ~= nil then
         if options['query'] ~= nil then

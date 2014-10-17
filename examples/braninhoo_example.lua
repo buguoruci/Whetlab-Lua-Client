@@ -19,9 +19,9 @@ scientist = whetlab(name,
                     parameters,
                     outcome)
 
-for i in 1,100 do
+for i = 1,100 do
     -- Get suggested new experiment
-    job = scientist.suggest()
+    job = scientist:suggest()
 
     -- Perform experiment: Braninhoo function
     if job.X > 10 then
@@ -31,5 +31,5 @@ for i in 1,100 do
     end
     
     -- Inform scientist about the outcome
-    scientist.update(job,-result)
+    scientist:update(job,-result)
 end
