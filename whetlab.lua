@@ -29,8 +29,6 @@ function table_equal(x,y)
     return true
 end
 
-
-
 -- Helper function for sleep
 local clock = os.clock
 function sleep(n)  -- seconds
@@ -38,7 +36,19 @@ function sleep(n)  -- seconds
   while math.abs(clock() - t0) <= n do end
 end
 
--- Helper function for different types of errors
+-- Helper function to test for nan
+function isnan(x)
+    -- NaN is the only number that doesn't equal itself
+    return type(x) == "number" and (x ~= x)
+end
+
+-- Helper function to test for inf
+function isinf(x)
+    z = 1/0
+    return (x == z) or (x == -z)
+end
+
+-- Helper functions for different types of errors
 
 function value_error(msg)
     error('Whetlab:ValueError: ' .. msg)
@@ -592,7 +602,7 @@ function Experiment:delete()
 end
 
 function Experiment:update(param_values, outcome_val)
-    ---- update(self, param_values, outcome_val)
+    ---- update(param_values, outcome_val)
     -- Update the experiment with the outcome value associated with some parameter values.
     -- This informs Whetlab of the resulting outcome corresponding to
     -- the experiment specified by _param_values_.  _param_values_ can 
@@ -616,78 +626,71 @@ function Experiment:update(param_values, outcome_val)
 
     --- I'M HERE!!
 
-    if (length(outcome_val) > 1) or ((isstruct(param_values) and length(param_values) > 1)) then
-        error('Whetlab:ValueError', 'Update does not accept more than one result at a time')
+    if type(outcome_val) ~= "number" then
+        value_error('The outcome value must be a number')
     end
 
-
-    if isfield(param_values,'result_id_') then
-        result_id = param_values.('result_id_')
+    if param_values['result_id_'] ~= nil then
+        result_id = param_values['result_id_']
     else
         -- Check whether this param_values has a result ID
         result_id = self.get_id(param_values)
     end
 
-    if result_id == -1 then
+    if result_id == nil or result_id == -1 then
         -- - Add new results with param_values and outcome_val
 
         -- Create variables for new result
-        param_names = self.params_to_setting_ids.keySet().toArray()
-        for i = 1:numel(param_names) do
-            name = param_names(i)
-            setting_id = self.params_to_setting_ids.get(name)
-            if isfield(param_values, name) then
-                value = param_values.(name)
-            elseif strcmp(name, self.outcome_name) then
+        variables = {}
+        for name,setting_id in pairs(self.params_to_setting_ids) do
+            if param_values[name] ~= nil then
+                value = param_values[name]
+            elseif name == self.outcome_name then
                 value = outcome_val
                 -- Convert the outcome to a constraint violation if it's not finite
                 -- This is needed to send the JSON in a manner that will be parsed
                 -- correctly server-side.
                 if isnan(outcome_val) then
                     value = 'NaN'
-                elseif ~isfinite(outcome_val) then
+                elseif isinf(outcome_val) then
                     value = '-infinity' 
                 end
             else
-                error('InvalidJobError',...
-                    'The job specified is invalid')
+                error('InvalidJobError: The job specified is invalid.')
             end
-            variables(i) = struct('setting', setting_id,...
-                'name',name, 'value',value)                
-        end
-        result.variables = variables
-        result_id = self.client.add_result(variables, self.experiment_id)
+            table.insert(variables, {'setting', setting_id, 'name', name, 'value', value})
+        end        
+        result = {variables = variables}
+        result_id = self.client:add_result(variables, self.experiment_id)
 
-        self.ids_to_param_values.put(result_id, savejson('',param_values))
+        self.ids_to_param_values[result_id] = param_values
     else
-        result = self.client.get_result(result_id)
-
-        for i = 1:numel(result.variables) do
-            var = result.variables{i}
-            if strcmp(var.('name'), self.outcome_name) then
+        result = self.client:get_result(result_id)
+        for i, var in pairs(result.variables) do
+            if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
                 -- This is needed to send the JSON in a manner that will be parsed
-                -- correctly server-side.                    
+                -- correctly server-side.
                 result.variables{i}.('value') = outcome_val
                 if isnan(outcome_val) then
-                    result.variables{i}.('value') = 'NaN'
+                    result.variables[i]['value'] = 'NaN'
                 elseif ~isfinite(outcome_val) then
-                    result.variables{i}.('value') = '-infinity'
+                    result.variables[i]['value'] = '-infinity'
                 end
-                self.outcome_values.put(result_id, savejson('',var))
+                self.outcome_values[result_id] = var
                 break -- Assume only one outcome per experiment!
             end
         end
 
-        self.param_values.put(result_id, savejson('',result))
-        self.client.update_result(result_id, result)
+        self.param_values[result_id] = result
+        self.client:update_result(result_id, result)
 
     end
-    self.ids_to_outcome_values.put(result_id, outcome_val)
+    self.ids_to_outcome_values[result_id] = outcome_val
 end --update
 
 function Experiment:cancel(param_values)
-    ---- cancel(self,param_values)
+    ---- cancel(param_values)
     -- Cancel a job, by removing it from the jobs recorded so far in the experiment.
     --
     -- * *param_values* (struct): Values of the parameters for the job to cancel.
@@ -707,22 +710,20 @@ function Experiment:cancel(param_values)
     -- Check whether this param_values has a results ID
     id = self.get_id(param_values)
     if id > 0 then
-        self.ids_to_param_values.remove(num2str(id))
+        self.ids_to_param_values[id] = nil
 
         -- Delete from internals
-        if self.ids_to_outcome_values.containsKey(id) then
-            self.ids_to_outcome_values.remove(id)
-        end
+        self.ids_to_outcome_values[id] = nil
             
         -- Delete from server
-        self.client.delete_result(id)
+        self.client:delete_result[id]
     else
-        warning('Did not find experiment with the provided parameters')
+        error('Did not find experiment with the provided parameters')
     end
 end -- cancel
 
 function Experiment:best()
-    ---- param_values = best(self)
+    ---- param_values = best()
     -- Return the job with best outcome found so far.        
     --
     -- * *returns:* Parameter values corresponding to the best outcome.
@@ -739,25 +740,26 @@ function Experiment:best()
     --   -- Get the best job seen so far.
     --   best = scientist.best()
 
-    -- Sync with the REST server     
-    self = self.sync_with_server()
+    -- Sync with the REST server
+    self.sync_with_server()
 
-    -- Find ID of result with best outcomeh
-    ids = self.ids_to_outcome_values.keySet().toArray()
-    outcomes = self.ids_to_outcome_values.values().toArray()
-    outcomes = arrayfun(@(x)x, outcomes)
-
-    [~, ind] = max(outcomes)
-    result_id = ids(ind)
-
-    -- Get param values that generated this outcome
-    result = self.client.get_result(result_id)
-    for i = 1:numel(result.('variables')) do
-        v = result.('variables'){i}
-        if ~strcmp(v.name, self.outcome_name) then
-            param_values.(v.name) = v.value
+    -- Find ID of result with best outcome
+    bestid = -1
+    bestval = -1/0
+    for id, outcome in pairs(self.ids_to_outcome_values) do
+        if outcome > bestval then
+            bestval = outcome
+            bestid  = id
         end
     end
-    
+
+    -- Get param values that generated this outcome
+    result = self.client.get_result(bestid)
+    param_values = {}
+    for i, var in pairs(result.variables) do
+        if var.name ~= self.outcome_name then
+            param_values[name] = v.value
+        end
+    end
 end -- best
     
