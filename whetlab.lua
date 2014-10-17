@@ -349,7 +349,33 @@ function Experiment:sync_with_server()
     local found = false
 
     if self.experiment_id < 0 then
-        self.experiment_id = self.client:find_experiment(self.experiment)
+
+        -- Look for experiment and get the ID... search one page at a time
+        page = 1
+        more_pages = true
+        experiment_id = -1
+        found = false
+        while more_pages
+            rest_exps = self.client:experiments():get({'query'={'page'=page}}).body
+        
+            -- Check if more pages to come
+            more_pages = rest_exps['next'] ~= nil
+            page = page + 1
+
+            -- Find in current page whether we find the experiment we are looking for
+            rest_exps = rest_exps.results
+            for i, expt in pairs(rest_exps) do
+                if expt.name  == name then
+                    experiment_id = expt.id
+                    found = true
+                    break
+                end
+            end
+            if found
+                break
+            end
+        end
+
         if self.experiment_id < 0 then
             enf_error('Experiment with name ' .. self.experimnet .. ' and description ' .. self.experiment_description  ' not found.')
         end
@@ -360,7 +386,8 @@ function Experiment:sync_with_server()
     end
 
     -- Get settings for this task, to get the parameter and outcome names
-    local rest_parameters = self.client:get_parameters(self.experiment_id)
+    local rest_parameters = self.client:settings():get(tostring(experiment_id), {'query'={'page_size'=self.INF_PAGE_SIZE}}).body.results
+
     self.parameters = {}
     for i,param in pairs(rest_parameters) do
         param = rest_parameters{i}
@@ -394,7 +421,7 @@ function Experiment:sync_with_server()
     end
 
     -- Get results generated so far for this task
-    local rest_results = self.client:get_results(self.experiment_id)
+    local rest_results = self.client:results():get({'query'={'experiment'=experiment_id,'page_size'=self.INF_PAGE_SIZE}}).body.results
     -- Construct things needed by client internally, to keep track of
     -- all the results
 
@@ -509,26 +536,29 @@ function Experiment:suggest()
     --   job = scientist.suggest()
     
     self:sync_with_server()
-    local result_id = self.client:get_suggestion(self.experiment_id)
-    
+    res = self.client:suggest(tostring(experiment_id)).go()
+    res = res.body
+    local result_id = res['id']
+
     -- Poll the server for the actual variable values in the suggestion.  
     -- Once the Bayesian optimization proposes an
     -- experiment, the server will fill these in.
-    local result = self.client:get_result(result_id)
-    local variables = result.variables
-    while variables == nil
+    local result = client:result(resid):get()
+    variables = result['variables']
+
+    while next(variables) == nil
         sleep(2)
-        result = self.client:get_result(result_id)
-        variables = result.variables
+        result = client:result(resid):get()
+        variables = result['variables']
     end
     
     -- Put in a nicer format
-    local next = {}
+    local next_var = {}
     for i, variable in pairs(variables) do
         if variable.name ~= self.outcome_name then
-            next[variable.name] = variable.value
+            next_var[variable.name] = variable.value
         end
-    end        
+    end
 
     -- Keep track of id / param_values relationship
     self.ids_to_param_values[result_id] = next
@@ -600,7 +630,8 @@ function Experiment:delete()
     --   -- Delete this experiment and all corresponding results.
     --   scientist.delete()
     
-    self.client:delete_experiment(self.experiment_id)
+    res = self.client:experiment(tostring(self.experiment_id)):delete()
+    print('Experiment has been deleted')
 end
 
 function Experiment:update(param_values, outcome_val)
@@ -663,11 +694,13 @@ function Experiment:update(param_values, outcome_val)
             table.insert(variables, {'setting', setting_id, 'name', name, 'value', value})
         end        
         result = {variables = variables}
-        result_id = self.client:add_result(variables, self.experiment_id)
+
+        result = self.client:results():add(variables, experiment_id, true, '', '').body
+        result_id = result.id
 
         self.ids_to_param_values[result_id] = param_values
     else
-        result = self.client:get_result(result_id)
+        result = self.client:results():get({'query'={'experiment'=experiment_id,'page_size'=self.INF_PAGE_SIZE}}).body['results']
         for i, var in pairs(result.variables) do
             if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
@@ -685,8 +718,9 @@ function Experiment:update(param_values, outcome_val)
         end
 
         self.param_values[result_id] = result
-        self.client:update_result(result_id, result)
-
+        res = self.client:result(tostring(result_id)):update(
+            result.variables, result.experiment, result.userProposed,
+            result.description, result.createdDate, result.id)
     end
     self.ids_to_outcome_values[result_id] = outcome_val
 end --update
@@ -716,9 +750,9 @@ function Experiment:cancel(param_values)
 
         -- Delete from internals
         self.ids_to_outcome_values[id] = nil
-            
+
         -- Delete from server
-        self.client:delete_result[id]
+        res = self.client:result(tostring(result_id)):delete()
     else
         error('Did not find experiment with the provided parameters')
     end
@@ -756,7 +790,7 @@ function Experiment:best()
     end
 
     -- Get param values that generated this outcome
-    result = self.client.get_result(bestid)
+    result = self.client.result(tostring(result_id)):get().body
     param_values = {}
     for i, var in pairs(result.variables) do
         if var.name ~= self.outcome_name then
