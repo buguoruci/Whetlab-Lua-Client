@@ -4,8 +4,8 @@ whetlab = require("whetlab")
 
 -- Define parameters to optimize
 parameters = {}
-parameters['X'] = {'type','float', 'min', 0, 'max', 15, 'size', 1}
-parameters['Y'] = {'type','float', 'min', -5, 'max', 10, 'size', 1}
+parameters['X'] = {type='float', min=0, max=15, size=1}
+parameters['Y'] = {type='float', min=-5, max=10, size=1}
 
 outcome = {name = 'Negative Braninhoo Value'}
 

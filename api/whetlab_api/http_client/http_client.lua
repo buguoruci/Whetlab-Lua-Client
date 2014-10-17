@@ -135,9 +135,9 @@ function http_client:request(path, body, method, options)
    
     paramString = ''
     heads = {}
+
     if request_type == 'json' then
         request_type = 'application/json'
-
         for key,value in pairs(options) do
             body[key] = value
         end
@@ -153,6 +153,7 @@ function http_client:request(path, body, method, options)
                 end
             else
                 paramString = json.encode(body)
+                print(paramString)
                 source = ltn12.source.string(paramString)
                 jsonsize = # paramString
                 heads["content-length"] = jsonsize
@@ -185,18 +186,32 @@ function http_client:request(path, body, method, options)
     response = {}
     save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    
 
-    if method == 'get' then
+    if method == 'get' then        
         url = url .. '?' .. paramString
+        print(url)
         ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
     else
         ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
     end
 
-    -- Convert the json back to a lua table
     if response[1] ~= nil then
-        result = json.decode(table.concat(response))
+        response = table.concat(response)
     else
-        result = nil
+        response = nil
+    end
+
+    print(code)
+    print(response)
+
+    -- Success
+    if tonumber(code) > 199 and tonumber(code) < 300 then
+        if response ~= nil then
+            result = json.decode(response)
+        else
+            result = nil
+        end
+    else
+        error('ClientError: ' .. response)
     end
 
     --- show that we got a valid response

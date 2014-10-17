@@ -1,11 +1,11 @@
 
-client = require("api.whetlab_api.whetlab_api_client")
+whetlab_client = require("api.whetlab_api.whetlab_api_client")
 os     = require("os")
 io     = require("io")
 
 -- Validation things
-local supported_properties = {'isOutput', 'name', 'min', 'max', 'size', 'scale', 'units', 'type'}
-local required_properties = {'min', 'max'}
+local supported_properties = {isOutput=true, name=true, min=true, max=true, size=true, scale=true, units=true, type=true}
+local required_properties = {min=true, max=true}
 local default_values = {size = 1, scale = 'linear', units = 'Reals', type = 'float'}
 
 local INF_PAGE_SIZE = 1000000
@@ -36,8 +36,9 @@ end
 -- Helper function for sleep
 local clock = os.clock
 function sleep(n)  -- seconds
-  local t0 = clock()
-  while math.abs(clock() - t0) <= n do end
+    os.execute("sleep " .. tonumber(n))
+  -- local t0 = clock()
+  -- while math.abs(clock() - t0) <= n do end
 end
 
 -- Helper function to test for nan
@@ -205,6 +206,8 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     self.outcome_name = ''
     self.parameters = parameters
 
+    if resume == nil then resume = true end
+
     self.resume = resume or true
     self.experiment_id = -1
 
@@ -221,22 +224,21 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     if type(description) ~= 'string' then
-        value_error('Description of experiment must be a string.')
+        value_error('Description of experiment must be a sstring.')
     end
 
     -- Create REST server client
     local hostname = vars.api_url or 'https://www.whetlab.com/'
 
-    self.client = whetlab_client(api_token, {})
+    self.client = whetlab_client(access_token, {})
 
     self.experiment_description = description
     self.experiment = name
     self.outcome_name = outcome.name
-
     if resume then
+        print("exptid", self.experiment_id)
         -- Try to resume if the experiment exists. If it doesn't exist, we'll create it.
-        self.experiment_id = experiment_id
-        status, err = pcall(self.sync_with_server)
+        status, err = pcall(self:sync_with_server())
         if status then
             print('Resuming experiment ' .. self.experiment)
         else
@@ -295,8 +297,9 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
             if param.min >= param.max then
                 value_error('Parameter ' .. name .. ': min should be smaller than max.')
             end
+            param.name = name
         end
-        settings[name] = param
+        table.insert(settings, param)
     end
     self.parameters = settings
 
@@ -305,9 +308,12 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     for k,v in pairs(outcome) do param[k] = v end
     outcome = param
     outcome.name = self.outcome_name
-    settings[outcome.name] = outcome
+    table.insert(settings,outcome)
 
+    -- Actually create the experiment
     status, res = pcall(function () return self.client:experiments():create(name, description, settings) end)
+    print(status)
+    print("res", res)
     if not status then
         -- Resume, unless got a ConnectionError
         if resume and (res ~= '???Whetlab:ExperimentExists?????') then
@@ -318,11 +324,11 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
             error(res)
         end
     else
-        experiment_id = res.body['id']
+        experiment_id = res['id']
     end
 
     self.experiment_id = experiment_id
-
+    print("experiment id", self.experiment_id)
     -- Check if there are pending experiments
     p = self:pending()
     if tableLength(p) > 0 then
@@ -360,8 +366,10 @@ function Experiment:sync_with_server()
         experiment_id = -1
         found = false
         while more_pages do
-            rest_exps = self.client:experiments():get({query={page=page}}).body
+            rest_exps = self.client:experiments():get({query={page=page}})
         
+            print('rest_exps', rest_exps)
+
             -- Check if more pages to come
             more_pages = rest_exps['next'] ~= nil
             page = page + 1
@@ -381,10 +389,13 @@ function Experiment:sync_with_server()
         end
 
         if self.experiment_id < 0 then
-            enf_error('Experiment with name ' .. self.experimnet .. ' and description ' .. self.experiment_description  ' not found.')
+            enf_error('Experiment with name ' .. self.experiment .. ' and description ' .. self.experiment_description  .. ' not found.')
         end
     else
         local details = self.client:get_experiment_details(self.experiment_id)
+        res = self.client:experiments():get({query={id=experiment_id}}).body['results']
+        local details = res{1};
+
         self.experiment = details.name
         self.experiment_description = details.description
     end
