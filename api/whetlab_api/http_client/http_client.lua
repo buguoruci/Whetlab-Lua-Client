@@ -1,5 +1,5 @@
 local https = require('ssl.https') -- luasec
-local http = require('socket.http') -- luasec
+local http = require('socket.http') -- luasocket
 local json = require("json") -- luajson
 local ltn12 = require("ltn12")
 
@@ -195,7 +195,6 @@ function http_client:request(path, body, method, options)
         end
         code = tonumber(code)
 
-        -- for k,v in pairs(headers) do print(k,v) end
         -- Could not communicate with the server
         if ok == nil or code == nil then
             code = 600 -- Small hack to make us retry below
