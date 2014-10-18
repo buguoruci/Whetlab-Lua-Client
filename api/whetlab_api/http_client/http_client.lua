@@ -188,6 +188,12 @@ function http_client:request(path, body, method, options)
         else
             ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
         end
+        code = tonumber(code)
+
+        -- Could not communicate with the server
+        if ok == nil or code == nil then
+            code = 600 -- Small hack to make us retry below
+        end
 
         if response[1] ~= nil then
             response = json.decode(table.concat(response))
@@ -196,24 +202,28 @@ function http_client:request(path, body, method, options)
         end
 
         -- Success
-        if tonumber(code) > 199 and tonumber(code) < 300 then
+        if code > 199 and code < 300 then
             break
 
-        elseif tonumber(code) == 503 then
+        elseif code == 503 then
             if response ~= nil and response['retry_in'] ~= nil then
                 retry_secs = math.random(2*tonumber(result['retry_in']))
             else
                 retry_secs = math.random(2*RETRY_TIMES[i])
             end
             print('The server is currently undergoing temporary maintenance. Retrying in ' .. tostring(retry_secs) .. ' seconds.')
+            i = i-1
+        elseif code == 502 or code > 503 then
+            retry_secs = math.random(2*RETRY_TIMES[i])
+            print('There was a problem communicating with the server.  Retrying in ' .. tostring(retry_secs) .. ' seconds.')
         else
             message = {}
             for k,v in pairs(response) do table.insert(message, v) end
-            error('ClientError code:' .. code .. ' message: ' .. table.concat(message))
+            error('ClientError code:' .. tostring(code) .. ' message: ' .. table.concat(message))
             break
         end
 
-        os.execute("sleep " .. tonumber(n))
+        os.execute("sleep " .. tonumber(retry_secs))
     end
 
     return response
