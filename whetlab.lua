@@ -140,7 +140,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     -- ``table`` should contain the appropriate keys to properly describe
     -- the parameter:
     --
-    -- * **type**: type of the parameter, among ``float``, ``int`` and ``enum``(default: ``float``)
+    -- * **type**: type of the parameter, among ``float``, ``int`` and ``enum`` (default: ``float``)
     -- * **min**: minimum value of the parameter (only for types ``float`` and ``int``)
     -- * **max**: maximum value of the parameter (only for types ``float`` and ``int``)
     -- * **options**: cell of strings, of the possible values that can take an ``enum`` parameter (only for type ``enum``)
@@ -669,7 +669,6 @@ function Experiment:update(param_values, outcome_val)
         -- Check whether this param_values has a result ID
         result_id = self:get_id(param_values)
     end
-    print("Got a result id", result_id)
     if result_id == nil or result_id == -1 then
         -- - Add new results with param_values and outcome_val
 
@@ -700,7 +699,7 @@ function Experiment:update(param_values, outcome_val)
 
         self.ids_to_param_values[result_id] = param_values
     else
-        results = self.client:result(result_id):get({query={experiment=experiment_id, page_size=INF_PAGE_SIZE}})
+        result = self.client:result(result_id):get({query={experiment=experiment_id, page_size=INF_PAGE_SIZE}})
         for i, var in pairs(result.variables) do
             if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
