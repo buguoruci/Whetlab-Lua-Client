@@ -2,6 +2,9 @@ local https = require('ssl.https') -- luasec
 local json = require("json") -- luajson
 local ltn12 = require("ltn12")
 
+local MAX_RETRIES = 6
+local RETRY_TIMES = {5,30,60,150,300,600}
+
 -- Main HttpClient which is used by Api classes
 local http_client = {}; http_client.__index = http_client
 -- 'auth' = auth, 'options' = options, 'headers' = {}, 'base' = ''
@@ -175,66 +178,58 @@ function http_client:request(path, body, method, options)
     end
     
     --- build a http request
-    response = {}
-    save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    
+    for i = 1,MAX_RETRIES do
+        response = {}
+        save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    
 
-    if method == 'get' then        
-        url = url .. '?' .. paramString
-        ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
-    else
-        ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
-    end
-
-    if response[1] ~= nil then
-        response = table.concat(response)
-    else
-        response = nil
-    end
-
-    -- Success
-    if tonumber(code) > 199 and tonumber(code) < 300 then
-        if response ~= nil then
-            result = json.decode(response)
+        if string.upper(method) == 'GET' then        
+            url = url .. '?' .. paramString
+            ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
         else
-            result = nil
+            ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
         end
-    else
-        error('ClientError code:' .. code .. ' message: ' .. response)
+        code = tonumber(code)
+
+        -- Could not communicate with the server
+        if ok == nil or code == nil then
+            code = 600 -- Small hack to make us retry below
+        end
+
+        if response[1] ~= nil then
+            response = json.decode(table.concat(response))
+        else
+            response = nil
+        end
+
+        -- Success
+        if code > 199 and code < 300 then
+            break
+
+        -- Maintenance
+        elseif code == 503 then
+            if response ~= nil and response['retry_in'] ~= nil then
+                retry_secs = math.random(2*tonumber(result['retry_in']))
+            else
+                retry_secs = math.random(2*RETRY_TIMES[i])
+            end
+            print('The server is currently undergoing temporary maintenance. Retrying in ' .. tostring(retry_secs) .. ' seconds.')
+            i = i-1
+
+        -- Communication was distorted somehow
+        elseif code == 502 or code > 503 then
+            retry_secs = math.random(2*RETRY_TIMES[i])
+            print('There was a problem communicating with the server.  Retrying in ' .. tostring(retry_secs) .. ' seconds.')
+        else
+            message = {}
+            for k,v in pairs(response) do table.insert(message, v) end
+            error('ClientError code:' .. tostring(code) .. ' message: ' .. table.concat(message))
+            break
+        end
+
+        os.execute("sleep " .. tonumber(retry_secs))
     end
 
-    --- show that we got a valid response
-    -- print('Response:--------')
-    -- print(code)
-    -- print(ok)
-
-    -- if strfind(s.message, 'java.net')
-    --   error('Lua:HttpConection:ConnectionError',...
-    --      'Could not connect to server.');
-    -- else
-    --  rethrow(s);
-    -- end
-    -- end
-    -- Display a reasonable amount of information if the
-    -- Http request fails for whatever reason
-    -- if extras.isGood <= 0
-    --     msg = sprintf(['Http connection to --s failed ' ...
-    --                    'with status --s/--s. '], extras.url, ...
-    --                   num2str(extras.status.value), ...
-    --                   extras.status.msg);
-    --     -- Tack on the message from the server
-    --     if ~isempty(outputs)
-    --         msg = strcat(msg, sprintf(['Message from server: ' ...
-    --         '--s'], outputs));
-    --     end
-    --     error('MATLAB:HttpConection:ConnectionError', msg);
-    -- end
-    -- response = extras; -- Return the status code and
-    --                    -- headers as well
-    -- -- outputs can be empty on a delete
-    -- if ~isempty(outputs)
-    --     response.body = loadjson(outputs);
-    -- end
-
-    return result
+    return response
 end -- function
+
 return http_client

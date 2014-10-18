@@ -140,7 +140,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     -- ``table`` should contain the appropriate keys to properly describe
     -- the parameter:
     --
-    -- * **type**: type of the parameter, among ``float``, ``int`` and ``enum``(default: ``float``)
+    -- * **type**: type of the parameter, among ``float``, ``int`` and ``enum`` (default: ``float``)
     -- * **min**: minimum value of the parameter (only for types ``float`` and ``int``)
     -- * **max**: maximum value of the parameter (only for types ``float`` and ``int``)
     -- * **options**: cell of strings, of the possible values that can take an ``enum`` parameter (only for type ``enum``)
@@ -225,9 +225,10 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     -- Create REST server client
-    local hostname = vars.api_url or 'https://www.whetlab.com/'
+    local hostname = vars.api_url or 'https://www.whetlab.com/api/'
 
-    self.client = whetlab_client(access_token, {})
+    options = {base=hostname}
+    self.client = whetlab_client(access_token, options)
 
     self.experiment_description = description
     self.experiment = name
@@ -700,7 +701,7 @@ function Experiment:update(param_values, outcome_val)
 
         self.ids_to_param_values[result_id] = param_values
     else
-        results = self.client:result(result_id):get({query={experiment=experiment_id, page_size=INF_PAGE_SIZE}})
+        result = self.client:result(result_id):get({query={experiment=experiment_id, page_size=INF_PAGE_SIZE}})
         for i, var in pairs(result.variables) do
             if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
