@@ -205,6 +205,7 @@ function http_client:request(path, body, method, options)
         if code > 199 and code < 300 then
             break
 
+        -- Maintenance
         elseif code == 503 then
             if response ~= nil and response['retry_in'] ~= nil then
                 retry_secs = math.random(2*tonumber(result['retry_in']))
@@ -213,6 +214,8 @@ function http_client:request(path, body, method, options)
             end
             print('The server is currently undergoing temporary maintenance. Retrying in ' .. tostring(retry_secs) .. ' seconds.')
             i = i-1
+
+        -- Communication was distorted somehow
         elseif code == 502 or code > 503 then
             retry_secs = math.random(2*RETRY_TIMES[i])
             print('There was a problem communicating with the server.  Retrying in ' .. tostring(retry_secs) .. ' seconds.')
