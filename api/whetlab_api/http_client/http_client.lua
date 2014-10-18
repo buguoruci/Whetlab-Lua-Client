@@ -1,4 +1,5 @@
 local https = require('ssl.https') -- luasec
+local http = require('socket.http') -- luasec
 local json = require("json") -- luajson
 local ltn12 = require("ltn12")
 
@@ -147,6 +148,7 @@ function http_client:request(path, body, method, options)
                         paramString = paramString .. self:url_encode(key) .. '=' .. self:url_encode(value) .. '&'
                     end
                 end
+                source = ltn12.source.string('')
             else
                 paramString = json.encode(body)
                 source = ltn12.source.string(paramString)
@@ -182,21 +184,29 @@ function http_client:request(path, body, method, options)
         response = {}
         save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    
 
-        if string.upper(method) == 'GET' then        
+        if string.upper(method) == 'GET' then
             url = url .. '?' .. paramString
-            ok, code, headers = https.request{url = url, method = 'GET', headers = heads, source = nil, sink = save}
+        end
+
+        if string.match(url, 'http://') then
+            ok, code, headers = http.request{url = url, method = method, headers = heads, source = source, sink = save}
         else
             ok, code, headers = https.request{url = url, method = method, headers = heads, source = source, sink = save}
         end
         code = tonumber(code)
 
+        -- for k,v in pairs(headers) do print(k,v) end
         -- Could not communicate with the server
         if ok == nil or code == nil then
             code = 600 -- Small hack to make us retry below
         end
 
         if response[1] ~= nil then
-            response = json.decode(table.concat(response))
+            -- Try to decode json
+            local status, result = pcall(json.decode, table.concat(response))
+            if status then
+                response = result
+            end
         else
             response = nil
         end
