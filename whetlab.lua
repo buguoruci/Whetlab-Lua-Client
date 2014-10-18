@@ -113,7 +113,7 @@ function delete_experiment(name, access_token)
     --   whetlab.delete_experiment('My Experiment',access_token)
 
     -- First make sure the experiment with name exists
-    scientist = Experiment(name, '', {}, {}, true, access_token)
+    scientist = whetlab(name, '', {}, {}, true, access_token)
     scientist.delete()
 end
 
