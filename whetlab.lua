@@ -113,8 +113,9 @@ function delete_experiment(name, access_token)
     --   whetlab.delete_experiment('My Experiment',access_token)
 
     -- First make sure the experiment with name exists
-    scientist = whetlab(name, '', {}, {}, true, access_token)
-    scientist.delete()
+    access_token = access_token or ''
+    scientist = Experiment(name, '', {}, {}, true, access_token)
+    scientist:delete()
 end
 
 
@@ -670,6 +671,7 @@ function Experiment:update(param_values, outcome_val)
         -- Check whether this param_values has a result ID
         result_id = self:get_id(param_values)
     end
+
     if result_id == nil or result_id == -1 then
         -- - Add new results with param_values and outcome_val
 
