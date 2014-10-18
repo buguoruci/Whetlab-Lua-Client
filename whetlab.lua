@@ -293,9 +293,9 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
             -- Check compatibility of properties
             if param.min >= param.max then
                 value_error('Parameter ' .. name .. ': min should be smaller than max.')
-            end
-            param.name = name
+            end            
         end
+        param.name = name
         table.insert(settings, param)
     end
 
