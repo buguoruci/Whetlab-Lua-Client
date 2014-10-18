@@ -114,7 +114,7 @@ function delete_experiment(name, access_token)
 
     access_token = access_token or ''
     scientist = Experiment(name, '', {}, {}, true, access_token)
-    scientist.delete()
+    scientist:delete()
 end
 
 
