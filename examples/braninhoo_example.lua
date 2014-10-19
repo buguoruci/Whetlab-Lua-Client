@@ -6,6 +6,7 @@ whetlab = require("whetlab")
 parameters = {}
 parameters['X'] = {type='float', min=0, max=15, size=1}
 parameters['Y'] = {type='float', min=-5, max=10, size=1}
+parameters['Z'] = {type='enum', options={'who','cares','right'}}
 
 outcome = {name = 'Negative Braninhoo Value'}
 
@@ -22,7 +23,7 @@ scientist = whetlab(name,
 for i = 1,100 do
     -- Get suggested new experiment
     job = scientist:suggest()
-
+    print(job)
     -- Perform experiment: Braninhoo function
     if job.X > 10 then
         result = -math.huge
