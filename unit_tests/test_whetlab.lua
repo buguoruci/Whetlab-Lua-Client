@@ -333,16 +333,16 @@ end
 
 function TestWhetlab:setup() 
 	-- Make sure the test experiment doesn't exist
-	pcall( function () delete_experiment(testCase.default_expt_name) end)
+	pcall( function () delete_experiment(self.default_expt_name) end)
 end
 
 function TestWhetlab:teardown()
 	-- Make sure the test experiment doesn't exist
-	pcall( function () delete_experiment(testCase.default_expt_name) end)
+	pcall( function () delete_experiment(self.default_expt_name) end)
 end
 
 
 -- Running tests
 tests = TestWhetlab()
-tests:run()
+--tests:run()
 

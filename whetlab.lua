@@ -311,8 +311,8 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     -- Actually create the experiment
     status, res = pcall(function () return self.client:experiments():create(name, description, settings) end)
     if not status then
-        -- Resume, unless got a ConnectionError
-        if resume and (res ~= '???Whetlab:ExperimentExists?????') then
+        -- Resume, unless experiment was already created
+        if resume and res:find('Experiment with this User and Name already exists.') ~= nil then
             -- This experiment was just already created - race condition.
             self:sync_with_server()
             return self
@@ -664,6 +664,7 @@ function Experiment:update(param_values, outcome_val)
         value_error('The outcome value must be a number')
     end
 
+    local result_id
     if param_values['result_id_'] ~= nil then
         result_id = param_values['result_id_']
     else
@@ -690,11 +691,11 @@ function Experiment:update(param_values, outcome_val)
                     value = '-infinity' 
                 end
             else
-                error('InvalidJobError: The job specified is invalid.')
+                value_error('The job specified is invalid.')
             end
             table.insert(variables, {'setting', setting_id, 'name', name, 'value', value})
         end        
-        result = {variables = variables}
+        local result = {variables = variables}
 
         result = self.client:results():add(variables, self.experiment_id, true, '', '').body
         result_id = result.id
@@ -782,8 +783,8 @@ function Experiment:best()
     self:sync_with_server()
 
     -- Find ID of result with best outcome
-    bestid = -1
-    bestval = -1/0
+    local bestid = -1
+    local bestval = -1/0
     for id, outcome in pairs(self.ids_to_outcome_values) do
         if outcome > bestval then
             bestval = outcome
@@ -792,8 +793,8 @@ function Experiment:best()
     end
 
     -- Get param values that generated this outcome
-    result = self.client:result(tostring(bestid)):get().body
-    param_values = {}
+    local result = self.client:result(tostring(bestid)):get().body
+    local param_values = {}
     for i, var in pairs(result.variables) do
         if var.name ~= self.outcome_name then
             param_values[name] = v.value
