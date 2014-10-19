@@ -114,7 +114,7 @@ function delete_experiment(name, access_token)
 
     -- First make sure the experiment with name exists
     access_token = access_token or ''
-    scientist = Experiment(name, '', {}, {}, true, access_token)
+    scientist = Experiment.new(name, '', {}, {}, true, access_token)
     scientist:delete()
 end
 
