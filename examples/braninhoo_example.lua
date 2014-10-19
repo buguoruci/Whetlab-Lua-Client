@@ -22,7 +22,7 @@ scientist = whetlab(name,
 for i = 1,100 do
     -- Get suggested new experiment
     job = scientist:suggest()
-
+    print(job)
     -- Perform experiment: Braninhoo function
     if job.X > 10 then
         result = -math.huge
