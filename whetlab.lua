@@ -7,6 +7,7 @@ io     = require("io")
 local supported_properties = {isOutput=true, name=true, min=true, max=true, size=true, scale=true, units=true, type=true}
 local required_properties = {min=true, max=true}
 local default_values = {size = 1, scale = 'linear', units = 'Reals', type = 'float'}
+local supported_types = {integer=true,int=true,float=true,enum=true}
 
 local INF_PAGE_SIZE = 1000000
 
@@ -232,7 +233,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     if self.outcome_name == nil or self.outcome_name == '' then
-        value_error('Argument outcome should have a field called: name that is a non-empty string.')
+        value_error('Argument outcome should have a field called name that is a non-empty string.')
     end
     self.outcome_name = outcome.name
 
@@ -244,6 +245,10 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
         if param['type'] == nil then param['type'] = default_values['type'] end
         if param['type'] == "int" then param['type'] = "integer" end
         if param['isOutput'] == nil then param['isOutput'] = false end
+
+        if supported_types[param['type']] == nil then
+            value_error('Type ' .. param['type'] .. ' not a valid choice')
+        end
 
         if param['type'] == 'enum' then
             if param['options'] == nil or table_length(param['options']) < 2 then
@@ -451,7 +456,13 @@ function Experiment:sync_with_server()
                     v.value = -math.huge
                 end
 
-                self.ids_to_outcome_values[res_id] = v.value
+                -- Null values get interpreted as a function when they
+                -- get parsed from the json decoder
+                if type(v.value) == 'function' then
+                    self.ids_to_outcome_values[res_id] = 'pending'
+                else
+                    self.ids_to_outcome_values[res_id] = v.value
+                end
             else
                 -- Initialize to empty table if hasn't been created yet
                 if self.ids_to_param_values[res_id] == nil then self.ids_to_param_values[res_id] = {} end
@@ -487,7 +498,7 @@ function Experiment:pending()
     -- Find IDs of results with value nil and append parameters to returned list
     local ret = {}
     for key,val in pairs(self.ids_to_outcome_values) do
-        if val == nil then
+        if val == 'pending' or type(val) == 'function' then
             table.insert(ret, self.ids_to_param_values[key])
         end
     end
@@ -569,9 +580,10 @@ function Experiment:suggest()
         end
     end
 
-    -- Keep track of id / param_values relationship
-    self.ids_to_param_values[result_id] = next_var
+    -- Keep track of id / param_values relationship    
     next_var.result_id_ = result_id
+    self.ids_to_param_values[result_id] = next_var
+
     return next_var
 end -- suggest
 
@@ -598,8 +610,8 @@ function Experiment:get_id(param_values)
     --   -- Get the corresponding experiment id.
     --   id = scientist.get_id(job)
 
-    if param_values[result_id_] ~= nil then
-        return param_values[result_id_]
+    if param_values.result_id_ ~= nil and param_values.result_id_ > 0 then
+        return param_values.result_id_
     end
 
     -- First sync with the server
@@ -674,6 +686,7 @@ function Experiment:update(param_values, outcome_val)
         result_id = self:get_id(param_values)
     end
 
+    local variables
     if result_id == nil or result_id == -1 then
         -- - Add new results with param_values and outcome_val
 
@@ -681,9 +694,7 @@ function Experiment:update(param_values, outcome_val)
         variables = {}
         for name,setting_id in pairs(self.params_to_setting_ids) do
 
-            if param_values[name] ~= nil then
-                value = param_values[name]
-            elseif name == self.outcome_name then
+            if name == self.outcome_name then
                 value = outcome_val
                 -- Convert the outcome to a constraint violation if it's not finite
                 -- This is needed to send the JSON in a manner that will be parsed
@@ -693,19 +704,20 @@ function Experiment:update(param_values, outcome_val)
                 elseif isinf(outcome_val) then
                     value = '-infinity' 
                 end
+            elseif param_values[name] ~= nil then
+                value = param_values[name]
             else
                 error('InvalidJobError: The job specified is invalid.')
             end
-            table.insert(variables, {'setting', setting_id, 'name', name, 'value', value})
+            table.insert(variables, {setting=setting_id, name=name, value=value})
         end        
-        local result = {variables = variables}
 
-        result = self.client:results():add(variables, self.experiment_id, true, '', '').body
+        local result = self.client:results():add(variables, self.experiment_id, true, '', '')
         result_id = result.id
 
         self.ids_to_param_values[result_id] = param_values
     else
-        result = self.client:result(result_id):get({query={experiment=self.experiment_id, page_size=INF_PAGE_SIZE}})
+        local result = self.client:result(result_id):get({query={experiment=self.experiment_id, page_size=INF_PAGE_SIZE}})
         for i, var in pairs(result.variables) do
             if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
@@ -786,23 +798,30 @@ function Experiment:best()
     self:sync_with_server()
 
     -- Find ID of result with best outcome
-    bestid = -1
-    bestval = -1/0
+    local bestid = -1
+    local bestval = -1/0
     for id, outcome in pairs(self.ids_to_outcome_values) do
-        if outcome > bestval then
+        if type(outcome) == 'number' and outcome > bestval then
             bestval = outcome
             bestid  = id
         end
     end
 
+    if (bestid == -1) then
+        error('There are no results yet from which to obtain the best.')
+    end
+
     -- Get param values that generated this outcome
-    result = self.client:result(tostring(bestid)):get().body
-    param_values = {}
+    local result = self.client:result(tostring(bestid)):get()
+    local param_values = {}
     for i, var in pairs(result.variables) do
         if var.name ~= self.outcome_name then
-            param_values[name] = v.value
+            param_values[var.name] = var.value
         end
     end
+    -- Tack on result id
+    param_values['result_id_'] = result.id
+    return param_values
 end -- best
 
 return Experiment
