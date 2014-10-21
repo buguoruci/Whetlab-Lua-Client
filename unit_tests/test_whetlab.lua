@@ -30,27 +30,27 @@ function TestWhetlab.new()
 	    -- Create a new experiment 
 	    local scientist = whetlab('New experiment', 'Foo', parameters, outcome)
 	    
-		delete_experiment('New experiment')
+		whetlab.delete_experiment('New experiment')
 	end
 	self.testCreateDeleteExperiment = testCreateDeleteExperiment
 
 	function testSuggestUpdateExperiment(self)
-	    local parameters = {}
-	    parameters.Lambda = {type = 'float', min = 1e-4, max = 0.75, size=1}
-	    parameters.Alpha = {type = 'float', min = 1e-4, max = 1, size = 1}
-	    local outcome = {}
-	    outcome.name = 'Negative deviance'
+		local parameters = {}
+		parameters.Lambda = {type = 'float', min = 1e-4, max = 0.75, size=1}
+		parameters.Alpha = {type = 'float', min = 1e-4, max = 1, size = 1}
+		local outcome = {}
+		outcome.name = 'Negative deviance'
 
-	    -- Create a new experiment 
-	    local scientist = whetlab(self.default_expt_name, 'Foo', parameters, outcome)
+		-- Create a new experiment 
+		local scientist = whetlab(self.default_expt_name, 'Foo', parameters, outcome)
 
-	    local job = scientist:suggest()
-	    scientist:update(job, 12)
+		local job = scientist:suggest()
+		scientist:update(job, 12)
 
-	    scientist:cancel(job)
+		scientist:cancel(job)
 
-	    job = scientist:suggest()
-	    scientist:update(job, 6.7)
+		job = scientist:suggest()
+		scientist:update(job, 6.7)
 	end
 	self.testSuggestUpdateExperiment = testSuggestUpdateExperiment
 
@@ -132,10 +132,9 @@ function TestWhetlab.new()
 	    parameters.Lambda = {type = 'float', min = 1e-4, max = 0.75, size=1}
 	    parameters.Alpha = {type = 'float', min = 1e-4, max = 1, size = 1}
 	    parameters.nwidgets = {type = 'integer', min = 1, max = 100, size = 1}
-	    local outcome = {}
-	    outcome.name = 'Mojo'
+	    local outcome = {name = 'Mojo'}
 
-	    -- Create a new experiment 
+	    -- Create a new experiment
 	    local scientist = whetlab(self.default_expt_name, 'W00t', parameters, outcome)
 	    
 	    local jobs = {}
@@ -204,7 +203,7 @@ function TestWhetlab.new()
 	    outcome.name = ''
 
 		local status, err = pcall(function () whetlab(self.default_expt_name, 'Foo', parameters, outcome) end )
-		assert(not status and err:find('required') ~= nil)
+		assert(not status and err:find('non-empty') ~= nil)
 	end
 	self.testEmptyOutcome = testEmptyOutcome
 
@@ -228,11 +227,10 @@ function TestWhetlab.new()
 	    parameters.Lambda = {type = 'float', min = 1e-4, max = 0.75, size=1}
 	    parameters.Alpha = {type = 'float', min = 1e-4, max = 1, size = 1}
 	    parameters.nwidgets = {type = 'integer', min = 1, max = 100, size = 1}
-	    local outcome = {}
-	    outcome.name = 'Bleh'
+	    local outcome = {name = 'Bleh'}
 
 		-- Create a new experiment 
-		scientist = whetlab(self.default_expt_name, '', parameters, outcome)
+		scientist = whetlab(self.default_expt_name, 'Some description', parameters, outcome, true)
 
 	    local jobs = {}
 	    -- Get suggestions and update with results
@@ -249,7 +247,7 @@ function TestWhetlab.new()
 	    	jobs[i] = job
 	    end
 
-		jobs[11] = {Lambda=0.1, Alpha=0.4, nwdigets = 44}
+		jobs[11] = {Lambda=0.1, Alpha=0.4, nwidgets = 44}
 
 		scientist:update(jobs[11],0.5)
 
@@ -333,12 +331,12 @@ end
 
 function TestWhetlab:setup() 
 	-- Make sure the test experiment doesn't exist
-	pcall( function () delete_experiment(testCase.default_expt_name) end)
+	pcall( function () whetlab.delete_experiment('Lua test experiment') end)
 end
 
 function TestWhetlab:teardown()
 	-- Make sure the test experiment doesn't exist
-	pcall( function () delete_experiment(testCase.default_expt_name) end)
+	pcall( function () whetlab.delete_experiment('Lua test experiment') end)
 end
 
 

@@ -96,29 +96,6 @@ function read_dot_file()
     return vars
 end
 
-function delete_experiment(name, access_token)
-    ---- delete_experiment(name, access_token)
-    --
-    -- Delete the experiment with the given name.  
-    --
-    -- Important, this cancels the experiment and removes all saved results!
-    --
-    -- * *name* (str): Experiment name
-    -- * *access_token* (str): User access token
-    --
-    -- Example usage::
-    --
-    --   -- Delete the experiment and all corresponding results.
-    --   access_token = '' -- Assume this is taken from ~/.whetlab
-    --   whetlab.delete_experiment('My Experiment',access_token)
-
-    -- First make sure the experiment with name exists
-    access_token = access_token or ''
-    scientist = Experiment.new(name, '', {}, {}, true, access_token)
-    scientist:delete()
-end
-
-
 -- Definition of Experiment class --
 
 local Experiment = {}
@@ -217,7 +194,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     -- Make a few obvious asserts
-    if name == '' then
+    if name == '' or name == nil then
         value_error('Name of experiment must be a non-empty string.')
     end
 
@@ -254,8 +231,8 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
         value_error('Outcome of experiment must be a table.')
     end
 
-    if outcome['name'] == nil then
-        value_error('Argument outcome should have a field called: name.')
+    if self.outcome_name == nil or self.outcome_name == '' then
+        value_error('Argument outcome should have a field called: name that is a non-empty string.')
     end
     self.outcome_name = outcome.name
 
@@ -335,6 +312,27 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     return self
 
 end -- Experiment()
+
+function Experiment.delete_experiment(name, access_token)
+    ---- delete_experiment(name, access_token)
+    --
+    -- Delete the experiment with the given name.  
+    --
+    -- Important, this cancels the experiment and removes all saved results!
+    --
+    -- * *name* (str): Experiment name
+    -- * *access_token* (str): User access token
+    --
+    -- Example usage::
+    --
+    --   -- Delete the experiment and all corresponding results.
+    --   access_token = '' -- Assume this is taken from ~/.whetlab
+    --   whetlab.delete_experiment('My Experiment',access_token)
+
+    -- First make sure the experiment with name exists
+    local scientist = Experiment(name, '', {}, {}, true, access_token)
+    scientist:delete()
+end
 
 function Experiment:sync_with_server()
     ---- sync_with_server()
@@ -600,6 +598,10 @@ function Experiment:get_id(param_values)
     --   -- Get the corresponding experiment id.
     --   id = scientist.get_id(job)
 
+    if param_values[result_id_] ~= nil then
+        return param_values[result_id_]
+    end
+
     -- First sync with the server
     self:sync_with_server()
 
@@ -634,7 +636,6 @@ function Experiment:delete()
     --
     --   -- Delete this experiment and all corresponding results.
     --   scientist.delete()
-    
     res = self.client:experiment(tostring(self.experiment_id)):delete()
     print('Experiment has been deleted')
 end
@@ -664,6 +665,7 @@ function Experiment:update(param_values, outcome_val)
     if type(outcome_val) ~= "number" then
         value_error('The outcome value must be a number')
     end
+    local result_id = -1
 
     if param_values['result_id_'] ~= nil then
         result_id = param_values['result_id_']
@@ -678,6 +680,7 @@ function Experiment:update(param_values, outcome_val)
         -- Create variables for new result
         variables = {}
         for name,setting_id in pairs(self.params_to_setting_ids) do
+
             if param_values[name] ~= nil then
                 value = param_values[name]
             elseif name == self.outcome_name then
@@ -695,7 +698,7 @@ function Experiment:update(param_values, outcome_val)
             end
             table.insert(variables, {'setting', setting_id, 'name', name, 'value', value})
         end        
-        result = {variables = variables}
+        local result = {variables = variables}
 
         result = self.client:results():add(variables, self.experiment_id, true, '', '').body
         result_id = result.id
@@ -721,7 +724,7 @@ function Experiment:update(param_values, outcome_val)
         end
         self.param_values[result_id] = newresult
 
-        res = self.client:result(tostring(result_id)):update(
+        local res = self.client:result(tostring(result_id)):update(
             newresult.variables, newresult.experiment, newresult.userProposed,
             newresult.description, newresult.createdDate, newresult.id)
     end
@@ -747,7 +750,7 @@ function Experiment:cancel(param_values)
     --   scientist.cancel(job)
     
     -- Check whether this param_values has a results ID
-    id = self:get_id(param_values)
+    local id = self:get_id(param_values)
     if id > 0 then
         self.ids_to_param_values[id] = nil
 
@@ -755,7 +758,7 @@ function Experiment:cancel(param_values)
         self.ids_to_outcome_values[id] = nil
 
         -- Delete from server
-        res = self.client:result(tostring(id)):delete()
+        local res = self.client:result(tostring(id)):delete()
     else
         error('Did not find experiment with the provided parameters')
     end

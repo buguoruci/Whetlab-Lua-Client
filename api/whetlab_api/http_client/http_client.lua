@@ -230,8 +230,13 @@ function http_client:request(path, body, method, options)
             print('There was a problem communicating with the server.  Retrying in ' .. tostring(retry_secs) .. ' seconds.')
         else
             message = {}
-            for k,v in pairs(response) do table.insert(message, v) end
-            error('ClientError code:' .. tostring(code) .. ' message: ' .. table.concat(message))
+            if type(response) == "table" then
+                for k,v in pairs(response) do table.insert(message, v) end
+                message = table.concat(message)
+            else
+                message = response
+            end
+            error('ClientError code:' .. tostring(code) .. ' message: ' .. message)
             break
         end
 
