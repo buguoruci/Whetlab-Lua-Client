@@ -21,4 +21,4 @@ Now you just have to add whetlab to your LUA_PATH:
 Getting Started
 ---------------
 
-Check out our Lua client [API Reference](https://www.whetlab.com/docs/lua-api-reference/) for details on how to use the client or take a look at the [examples](https://github.com/whetlab/Whetlab-Lua-Client/examples) subdirectory for example usage.
+Check out our Lua client [API Reference](https://www.whetlab.com/docs/lua-api-reference/) for details on how to use the client or take a look at the [examples](https://github.com/whetlab/Whetlab-Lua-Client/tree/master/examples) subdirectory for example usage.
