@@ -1,11 +1,11 @@
-Result = require('api.whetlab_api.api.Result')
-Results = require('api.whetlab_api.api.Results')
-Setting = require('api.whetlab_api.api.Setting')
-Settings = require('api.whetlab_api.api.Settings')
-Suggest = require('api.whetlab_api.api.Suggest')
-Experiment = require('api.whetlab_api.api.Experiment')
-Experiments = require('api.whetlab_api.api.Experiments')
-http_client = require('api.whetlab_api.http_client.http_client')
+local Result = require('api.whetlab_api.api.Result')
+local Results = require('api.whetlab_api.api.Results')
+local Setting = require('api.whetlab_api.api.Setting')
+local Settings = require('api.whetlab_api.api.Settings')
+local Suggest = require('api.whetlab_api.api.Suggest')
+local Experiment = require('api.whetlab_api.api.Experiment')
+local Experiments = require('api.whetlab_api.api.Experiments')
+local http_client = require('api.whetlab_api.http_client.http_client')
 
 local client = {}; client.__index = client
 
