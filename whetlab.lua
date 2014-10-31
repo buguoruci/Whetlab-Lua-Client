@@ -681,7 +681,6 @@ function Experiment:update(param_values, outcome_val)
     end
     local result_id = -1
 
-    local result_id
     if param_values['result_id_'] ~= nil then
         result_id = param_values['result_id_']
     else
