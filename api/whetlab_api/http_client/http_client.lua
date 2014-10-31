@@ -19,7 +19,8 @@ local function construct(objname, auth, options)
 
     self.options = {}
     self.headers = {}
-    self.options['base'] = 'https://www.whetlab.com/api/'
+    self.options['base'] = 'https://www.whetlab.com/'
+    self.options['api_version'] = 'api'
     self.options['user_agent'] = 'whetlab_lua_client'
 
     for key,value in pairs(options) do
@@ -28,6 +29,10 @@ local function construct(objname, auth, options)
     
     if self.options['base'] ~= nil then
         self['base'] = self.options['base']
+    end
+
+    if self.options['api_version'] ~= nil then
+        self['api_version'] = self.options['api_version']
     end
 
     if self.options['user_agent'] ~= nil then
@@ -162,7 +167,11 @@ function http_client:request(path, body, method, options)
     end
 
     if self.options['api_version'] == nil then
-        self.options['api_version'] = ''
+        if self['api_version'] ~= nil then
+            self.options['api_version'] = self.api_version
+        else
+            self.options['api_version'] = ''
+        end
     end
 
     url = self.base .. '/' .. self.options['api_version'] .. '/' .. path

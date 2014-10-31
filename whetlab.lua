@@ -21,6 +21,9 @@ end
 -- A simple helper function to compare two tables
 function table_equal(x,y)
     if type(x) ~= 'table' or type(y) ~= 'table' then
+        if type(x) == 'number' and type(y) == 'number' then
+            return ((x-y)^2 < 1e-12)
+        end
         return x == y
     end
 
@@ -204,7 +207,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     -- Create REST server client
-    local hostname = vars.api_url or 'https://www.whetlab.com/api/'
+    local hostname = vars.api_url or 'https://www.whetlab.com'
 
     options = {base=hostname}
     self.client = whetlab_client(access_token, options)

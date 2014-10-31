@@ -127,7 +127,7 @@ function TestWhetlab.new()
         job_best.result_id_ = nil
         new_best = scientist:best()
         new_best.result_id_ = nil
-
+        
         assert(table_equal(job_best,new_best))
     end
     self.testBestExperiment = testBestExperiment
