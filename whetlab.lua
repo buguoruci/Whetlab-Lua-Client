@@ -207,7 +207,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     end
 
     -- Create REST server client
-    local hostname = vars.api_url or 'https://www.whetlab.com/api/'
+    local hostname = vars.api_url or 'https://www.whetlab.com'
 
     options = {base=hostname}
     self.client = whetlab_client(access_token, options)
