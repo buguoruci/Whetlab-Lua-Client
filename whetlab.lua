@@ -21,6 +21,9 @@ end
 -- A simple helper function to compare two tables
 function table_equal(x,y)
     if type(x) ~= 'table' or type(y) ~= 'table' then
+        if type(x) == 'number' and type(y) == 'number' then
+            return ((x-y)^2 < 1e-12)
+        end
         return x == y
     end
 
