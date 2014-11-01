@@ -220,6 +220,7 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
         status, err = pcall(self.sync_with_server, self)
         if status then
             print('Resuming experiment ' .. self.experiment)
+            return self
         else
             if not err:find('404') then
                 error(err)
@@ -299,7 +300,6 @@ function Experiment.new(name, description, parameters, outcome, resume, access_t
     -- Actually create the experiment
     status, res = pcall(function () return self.client:experiments():create(name, description, settings) end)
     if not status then
-        -- Resume, unless experiment was already created
         if resume and res:find('Experiment with this User and Name already exists.') ~= nil then
             -- This experiment was just already created - race condition.
             self:sync_with_server()
