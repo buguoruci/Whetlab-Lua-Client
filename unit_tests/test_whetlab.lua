@@ -335,9 +335,8 @@ function TestWhetlab:run()
             else
                 print('Test ' .. name .. ' failed with: ' .. err)
                 n_failed = n_failed + 1
-
-            self:teardown()
             end
+            self:teardown()
         end
     end
     print('Failed ' .. n_failed .. ' tests on ' .. n_tests)
