@@ -230,13 +230,19 @@ function http_client:request(path, body, method, options)
             else
                 retry_secs = math.random(2*RETRY_TIMES[i])
             end
-            print('The server is currently undergoing temporary maintenance. Retrying in ' .. tostring(retry_secs) .. ' seconds.')
+            print('Warning: The server is currently undergoing temporary maintenance. Retrying in ' .. tostring(retry_secs) .. ' seconds.')
             i = i-1
 
         -- Communication was distorted somehow
         elseif code == 502 or code > 503 then
             retry_secs = math.random(2*RETRY_TIMES[i])
-            print('There was a problem communicating with the server.  Retrying in ' .. tostring(retry_secs) .. ' seconds.')
+            print('Warning: There was a problem communicating with the server.  Retrying in ' .. tostring(retry_secs) .. ' seconds.')
+
+        -- Throttling
+        elseif code == 429 then
+            retry_secs = math.random(2*RETRY_TIMES[i])
+            for k,v in pairs(response) do print(v) end
+            print('Warning: Rate limited by the server: Retrying in ' .. tostring(retry_secs) .. ' seconds.')
         else
             message = {}
             if type(response) == "table" then
