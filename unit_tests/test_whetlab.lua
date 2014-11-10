@@ -276,6 +276,68 @@ function TestWhetlab.new()
     end
     self.testResume = testResume
 
+    function test_get_all_results(self)
+        parameters = {}
+        parameters['Lambda'] = {['type'] = 'float', min = 1e-4, max = 0.75, size=1}
+        parameters['Alpha'] = {['type'] = 'float', min = 1e-4, max = 1, size = 1}
+        parameters['nwidgets'] = {['type'] = 'integer', min = 1, max = 100, size = 1}
+        outcome = {name = 'Bleh'}
+
+        -- Create a new experiment 
+        scientist = whetlab(self.default_expt_name, 'Some description', parameters, outcome, true)
+
+        function count_in_list(scientist, j, jobs)
+            local hits = 0
+            local indices = {}
+            for i, job in pairs(jobs) do
+                if scientist:get_id(job) == scientist:get_id(j) then
+                    hits = hits + 1
+                    table.insert(indices, i)
+                end
+            end
+            return hits, indices
+        end
+
+        local jobs = {}
+        local j
+        local o
+
+        for i = 1,5 do
+            table.insert(jobs, scientist:suggest())
+            j, o = scientist:get_all_results()
+            assert(table_length(j) == table_length(o))
+            assert(table_length(j) == i)
+            local hits, inds = count_in_list(scientist, jobs[i], j)
+            assert(hits == 1)
+            assert(o[inds[1]] == 'pending')
+        end
+
+        for i = 1,5 do
+            local result_id = scientist:get_id(jobs[i])
+            local outcome = math.random()
+            scientist:update(jobs[i], outcome)
+            j, o = scientist:get_all_results()
+            assert(table_length(j) == table_length(o))
+            local hits, inds = count_in_list(scientist, jobs[i], j)
+            assert(hits == 1)
+            -- for k,v in pairs(inds) do print(k,v) end
+            -- print(o[inds[1]])
+            -- print(outcome)
+            assert((o[inds[1]] - outcome)^2 < 1e-16)
+        end
+
+        for i = 1,5 do 
+            local result_id = scientist:get_id(jobs[i])
+            scientist:cancel(jobs[i])
+            j, o = scientist:get_all_results()
+            assert(table_length(j) == table_length(o))
+            local hits, inds = count_in_list(scientist, jobs[i], j)            
+            assert(hits == 0)
+            assert(table_length(j) == 5-i)
+        end
+    end
+    self.test_get_all_results = test_get_all_results    
+
     ---- Support for enums
     function testEnum(self)
 
@@ -320,12 +382,14 @@ function TestWhetlab.new()
     return self
 end
 
-function TestWhetlab:run()
+-- 'teststr' contains a string which must be in the test name.  Usually this
+-- will be 'test' to run all tests but you can also put in a specific test name.
+function TestWhetlab:run(teststr)
 
     local n_tests = 0
     local n_failed = 0
     for name, fct in pairs(self) do
-        if name:find('test') and type(fct) == 'function' then
+        if name:find(teststr) and type(fct) == 'function' then
             n_tests = n_tests + 1
             self:setup()
 
@@ -355,5 +419,4 @@ end
 
 -- Running tests
 tests = TestWhetlab()
-tests:run()
-
+tests:run('test')

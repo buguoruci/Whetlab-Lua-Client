@@ -478,6 +478,37 @@ function Experiment:sync_with_server()
     return true
 end
 
+function Experiment:get_all_results()
+    ---- jobs, outcomes = get_all_results()
+    -- Return the list of all jobs and corresponding outcomes
+    --
+    -- * *returns:* An array of parameter values and an array of outcome values
+    -- * *return type:* array
+    -- 
+    -- Example usage::
+    --
+    --   -- Create a new experiment
+    --   scientist = whetlab(name,
+    --               description,
+    --               parameters,
+    --               outcome, true, access_token)
+    --
+    --   -- Get the list of results
+    --   jobs, outcomes = scientist.get_all_results()
+
+    -- Sync with the REST server
+    self:sync_with_server()
+
+    -- Find IDs of results with value nil and append parameters to returned list
+    local jobs = {}
+    local outcomes = {}
+    for key,val in pairs(self.ids_to_outcome_values) do
+        table.insert(jobs, self.ids_to_param_values[key])
+        table.insert(outcomes, val)
+    end
+    return jobs, outcomes
+end -- get_all_results()
+
 function Experiment:pending()
     ---- pend = pending()
     -- Return the list of jobs which have been suggested, but for which no 
