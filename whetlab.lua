@@ -504,6 +504,9 @@ function Experiment:get_all_results()
     local outcomes = {}
     for key,val in pairs(self.ids_to_outcome_values) do
         table.insert(jobs, self.ids_to_param_values[key])
+        jobs[#jobs].result_id_ = key
+        jobs[#jobs].experiment_id_ = self.experiment_id_
+        assert(jobs[#jobs].result_id_ ~= nil)
         table.insert(outcomes, val)
     end
     return jobs, outcomes
@@ -617,7 +620,9 @@ function Experiment:suggest()
     end
 
     -- Keep track of id / param_values relationship    
+    next_var.experiment_id_ = self.experiment_id
     next_var.result_id_ = result_id
+    assert(result_id ~= nil)
     self.ids_to_param_values[result_id] = next_var
 
     return next_var
@@ -646,7 +651,7 @@ function Experiment:get_id(param_values)
     --   -- Get the corresponding experiment id.
     --   id = scientist.get_id(job)
 
-    if param_values.result_id_ ~= nil and param_values.result_id_ > 0 then
+    if param_values.result_id_ ~= nil and param_values.result_id_ > 0 and param_values.experiment_id_ == self.experiment_id then
         return param_values.result_id_
     end
 
@@ -654,9 +659,8 @@ function Experiment:get_id(param_values)
     self:sync_with_server()
 
     -- Remove key result_id_ if present
-    if param_values.result_id_ ~= nil then
-        param_values.result_id_ = nil
-    end
+    local result_id = param_values.result_id_
+    param_values.result_id_ = nil
 
     local id = -1
     for id, pv in pairs(self.ids_to_param_values) do
@@ -664,6 +668,9 @@ function Experiment:get_id(param_values)
             return id
         end
     end
+
+    param_values.result_id_ = result_id_
+
     return id
 end -- get_id
 
@@ -713,14 +720,9 @@ function Experiment:update(param_values, outcome_val)
     if type(outcome_val) ~= "number" then
         value_error('The outcome value must be a number')
     end
-    local result_id = -1
 
-    if param_values['result_id_'] ~= nil then
-        result_id = param_values['result_id_']
-    else
-        -- Check whether this param_values has a result ID
-        result_id = self:get_id(param_values)
-    end
+    -- Check whether this param_values has a result ID
+    local result_id = self:get_id(param_values)
 
     local variables
     if result_id == nil or result_id == -1 then
@@ -750,6 +752,7 @@ function Experiment:update(param_values, outcome_val)
 
         local result = self.client:results():add(variables, self.experiment_id, true, '', '')
         result_id = result.id
+        assert(result_id ~= nil)
 
         self.ids_to_param_values[result_id] = param_values
     else
@@ -856,7 +859,8 @@ function Experiment:best()
         end
     end
     -- Tack on result id
-    param_values['result_id_'] = result.id
+    param_values.result_id_ = result.id
+    param_values.experiment_id_ = self.experiment_id
     return param_values
 end -- best
 

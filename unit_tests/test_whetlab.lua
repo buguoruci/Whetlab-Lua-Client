@@ -124,10 +124,10 @@ function TestWhetlab.new()
             end
         end
 
-        job_best.result_id_ = nil
         new_best = scientist:best()
+
         new_best.result_id_ = nil
-        
+        job_best.result_id_ = nil
         assert(table_equal(job_best,new_best))
     end
     self.testBestExperiment = testBestExperiment
@@ -152,7 +152,8 @@ function TestWhetlab.new()
         end
         for i,j in pairs(jobs) do
             result = math.random()
-            scientist:update(j,result)
+            scientist:update(j, result)
+            assert(scientist:get_id(j) > 0)
         end
 
         for i,j in pairs(jobs) do
