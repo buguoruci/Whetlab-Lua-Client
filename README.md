@@ -4,7 +4,7 @@ Whetlab-Lua-Client
 Installing the Lua Client
 -------------------------
 
-The easiest way to install is using luarocks.  Just type:
+The easiest way to install is using [luarocks](http://luarocks.org/).  Just type:
 
     luarocks install whetlab
     
