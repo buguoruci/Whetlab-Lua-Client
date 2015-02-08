@@ -8,7 +8,9 @@ The easiest way to install is using luarocks.  Just type:
 
     luarocks install whetlab
     
-and you're done!  If you need to install from source:
+and you're done!  
+
+However, if you need to install from source:
 
 First download the Lua Client either as a zip archive [here](https://github.com/whetlab/Whetlab-Lua-Client/archive/master.zip) or clone it using Git
 
