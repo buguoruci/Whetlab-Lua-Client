@@ -25,7 +25,7 @@ for i = 1,100 do
 
     -- Perform experiment: Braninhoo function
     if job.X > 10 then -- A constraint
-        result = -math.huge
+        result = math.huge
     else
         result = (job.Y - (5.1/(4*math.pi^2))*job.X^2 + (5/math.pi)*job.X - 6)^2 + 10*(1-(1./(8*math.pi)))*math.cos(job.X) + 10*1
     end
