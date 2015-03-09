@@ -277,7 +277,7 @@ function TestWhetlab.new()
     end
     self.testResume = testResume
 
-    function test_get_all_results(self)
+    function testGetAllResults(self)
         parameters = {}
         parameters['Lambda'] = {['type'] = 'float', min = 1e-4, max = 0.75, size=1}
         parameters['Alpha'] = {['type'] = 'float', min = 1e-4, max = 1, size = 1}
@@ -338,6 +338,128 @@ function TestWhetlab.new()
         end
     end
     self.test_get_all_results = test_get_all_results    
+
+    ---- Get a result by the id.
+    function testGetByResultId(self)
+
+        parameters = {}
+        parameters['Lambda'] = {['type'] = 'float', min = 1e-4, max = 0.75, size=1}
+        parameters['Alpha'] = {['type'] = 'float', min = 1e-4, max = 1, size = 1}
+        parameters['nwidgets'] = {['type'] = 'integer', min = 1, max = 100, size = 1}
+        outcome = {name = 'Bleh'}
+
+        -- Create a new experiment 
+        scientist = whetlab(self.default_expt_name, 'Some description', parameters, outcome, true)
+
+        local jobs = {}
+        for i = 1,5 do
+            local job = scientist:suggest()
+            table.insert(jobs, job)
+        end
+
+        for i = 1,5 do
+            local result = math.random()
+            scientist:update(jobs[i],result)
+        end
+
+        for i = 1,5 do 
+            local result_id = scientist:get_id(jobs[i])
+            job = scientist:get_by_result_id(result_id)
+            assert(table_equal(job,jobs[i]))
+        end
+    end
+    self.testGetByResultId = testGetByResultId
+
+    ---- Update a failed results
+    function testUpdateAsFailed(self)
+
+        parameters = {}
+        parameters['Lambda'] = {['type'] = 'float', min = 1e-4, max = 0.75, size=1}
+        parameters['Alpha'] = {['type'] = 'float', min = 1e-4, max = 1, size = 1}
+        parameters['nwidgets'] = {['type'] = 'integer', min = 1, max = 100, size = 1}
+        outcome = {name = 'Bleh'}
+
+        -- Create a new experiment 
+        scientist = whetlab(self.default_expt_name, 'Some description', parameters, outcome, true)
+
+        local job = scientist:suggest()
+        scientist:update_as_failed(job)
+        local result_id = scientist:get_id(job)
+        assert(scientist.ids_to_outcome_values[result_id] == -math.huge)
+
+    end
+    self.testUpdateAsFailed = testUpdateAsFailed
+
+    ---- Update a result by the id.
+    function testUpdateByResultId(self)
+
+        parameters = {}
+        parameters['Lambda'] = {['type'] = 'float', min = 1e-4, max = 0.75, size=1}
+        parameters['Alpha'] = {['type'] = 'float', min = 1e-4, max = 1, size = 1}
+        parameters['nwidgets'] = {['type'] = 'integer', min = 1, max = 100, size = 1}
+        outcome = {name = 'Bleh'}
+
+        -- Create a new experiment 
+        scientist = whetlab(self.default_expt_name, 'Some description', parameters, outcome, true)
+
+        local jobs = {}
+        for i = 1,5 do
+            local job = scientist:suggest()
+            table.insert(jobs, job)
+        end
+
+        local results = {}
+        for i = 1,5 do 
+            local result_id = scientist:get_id(jobs[i])
+            local result = math.random()
+            scientist:update_by_result_id(result_id, result)
+            table.insert(results, result)
+        end
+
+        for i = 1,5 do 
+            local result_id = scientist:get_id(jobs[i])
+            assert(scientist.ids_to_outcome_values[result_id] == results[i])
+        end
+
+    end
+    self.testUpdateByResultId = testUpdateByResultId
+
+    ---- Cancel a result by the id.
+    function testCancelByResultId(self)
+
+        parameters = {}
+        parameters['Lambda'] = {['type'] = 'float', min = 1e-4, max = 0.75, size=1}
+        parameters['Alpha'] = {['type'] = 'float', min = 1e-4, max = 1, size = 1}
+        parameters['nwidgets'] = {['type'] = 'integer', min = 1, max = 100, size = 1}
+        outcome = {name = 'Bleh'}
+
+        -- Create a new experiment 
+        scientist = whetlab(self.default_expt_name, 'Some description', parameters, outcome, true)
+
+        local jobs = {}
+        for i = 1,5 do
+            local job = scientist:suggest()
+            table.insert(jobs, job)
+        end
+
+        for i = 1,5 do
+            local result = math.random()
+            scientist:update(jobs[i],result)
+        end
+
+        for i = 1,5 do 
+            local result_id = scientist:get_id(jobs[i])
+            scientist:cancel_by_result_id(result_id)
+        end
+
+        -- Make sure result was removed
+        scientist:sync_with_server()
+        assert(table_length(scientist.ids_to_param_values) == 0 )
+        assert(table_length(scientist.ids_to_outcome_values) == 0 )
+
+    end
+    self.testCancelByResultId = testCancelByResultId
+
 
     ---- Support for enums
     function testEnum(self)

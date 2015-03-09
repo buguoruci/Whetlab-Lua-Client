@@ -512,6 +512,65 @@ function Experiment:get_all_results()
     return jobs, outcomes
 end -- get_all_results()
 
+
+function Experiment:cancel_by_result_id(id)
+    ---- cancel(param_values)
+    -- Cancel a job/result indexed by the given unique _id_.
+    --
+    -- * *id* (int): ID of the job/result to cancel.
+    --
+
+    -- Delete from internals
+    self.ids_to_param_values[id] = nil
+    self.ids_to_outcome_values[id] = nil
+
+    -- Delete from server
+    local res = self.client:result(tostring(id)):delete()
+end
+
+function Experiment:update_by_result_id(result_id, outcome_val)
+    ---- update_by_result_id(result_id, outcome_val)
+    -- Update the experiment with the outcome value indexed by the given unique job/result _id_.
+    --
+    -- * *result_id* (int):      ID of the result.
+    -- * *outcome_val* (float):  Value of the outcome.
+    --
+
+    if type(outcome_val) ~= "number" then
+        value_error('The outcome value must be a number')
+    end
+
+
+    local result = self.client:result(result_id):get()
+    if result == nil or result['variables'] == nil then
+        value_error('Job with result_id ' .. result_id .. ' not found.')
+    end
+
+    local newresult = nil
+    for i, var in pairs(result.variables) do
+        if var.name == self.outcome_name then
+            -- Convert the outcome to a constraint violation if it's not finite
+            -- This is needed to send the JSON in a manner that will be parsed
+            -- correctly server-side.
+            newresult = result
+            newresult.variables[i]['value'] = outcome_val
+            if isnan(outcome_val) then
+                newresult.variables[i]['value'] = 'NaN'
+            elseif isinf(outcome_val) then
+                newresult.variables[i]['value'] = '-infinity'
+            end
+            self.outcome_values[result_id] = var
+            break -- Assume only one outcome per experiment!
+        end
+    end
+    self.param_values[result_id] = newresult
+
+    local res = self.client:result(tostring(result_id)):update(
+        newresult.variables, newresult.experiment, newresult.userProposed,
+        newresult.description, newresult.createdDate, newresult.id)
+    self.ids_to_outcome_values[result_id] = outcome_val
+end
+
 function Experiment:pending()
     ---- pend = pending()
     -- Return the list of jobs which have been suggested, but for which no 
@@ -627,6 +686,40 @@ function Experiment:suggest()
 
     return next_var
 end -- suggest
+
+function Experiment:get_by_result_id(id)
+    ---- result = get_by_result_id(id)
+    -- Return the parameter values corresponding to the given unique job/result _id_.
+    -- If no result matches, return _nil_.
+    --
+    -- * *id* (int): Result ID
+    -- * *returns:* Result corresponding to given ID. If not matched, _nil_ is returned.
+    -- * *return type:* table
+
+    local result = nil
+    for id2, pv in pairs(self.ids_to_param_values) do
+        if id == id2 then
+            result = pv
+        end
+    end
+
+    if result == nil then
+        -- If has not found result, try again after synching
+        self:sync_with_server()
+        for id2, pv in pairs(self.ids_to_param_values) do
+            if id == id2 then
+                result = pv
+            end
+        end
+    end
+
+    if result ~= nil then
+        result.result_id_ = id
+        result.experiment_id_ = self.experiment_id
+    end
+    return result
+end
+
 
 function Experiment:get_id(param_values)
     ---- id = get_id(param_values)
@@ -757,6 +850,7 @@ function Experiment:update(param_values, outcome_val)
         self.ids_to_param_values[result_id] = param_values
     else
         local result = self.client:result(result_id):get({query={experiment=self.experiment_id, page_size=INF_PAGE_SIZE}})
+        local newresult = nil
         for i, var in pairs(result.variables) do
             if var.name == self.outcome_name then
                 -- Convert the outcome to a constraint violation if it's not finite
@@ -781,6 +875,16 @@ function Experiment:update(param_values, outcome_val)
     end
     self.ids_to_outcome_values[result_id] = outcome_val
 end --update
+
+function Experiment:update_as_failed(param_values)
+    ---- update_as_failed(param_values)
+    -- Inform the experiment that the job with certain parameter values failed.
+    --
+    -- * *param* param_values: Names->Values of parameters.
+    -- * *type* param_values: table
+
+    self:update(param_values, -math.huge)
+end
 
 function Experiment:cancel(param_values)
     ---- cancel(param_values)
