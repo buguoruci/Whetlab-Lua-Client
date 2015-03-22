@@ -3,7 +3,7 @@ local http = require('socket.http') -- luasocket
 local json = require("json") -- luajson
 local ltn12 = require("ltn12")
 
-local MAX_RETRIES = 6
+local MAX_RETRIES = 2
 local RETRY_TIMES = {5,30,60,150,300,600}
 
 -- Main HttpClient which is used by Api classes
@@ -189,7 +189,12 @@ function http_client:request(path, body, method, options)
     end
     
     --- build a http request
-    for i = 1,MAX_RETRIES do
+    local i = 0
+    while true do
+        if i >= MAX_RETRIES then -- Doing this instead of a for loop so we can loop forever on maintenance if desired
+            break
+        end
+
         response = {}
         save = ltn12.sink.table(response) -- need a l1tn12 sink to get back the page content    
 
@@ -226,12 +231,12 @@ function http_client:request(path, body, method, options)
         -- Maintenance
         elseif code == 503 then
             if response ~= nil and response['retry_in'] ~= nil then
-                retry_secs = math.random(2*tonumber(result['retry_in']))
+                retry_secs = math.random(2*tonumber(response['retry_in']))
             else
                 retry_secs = math.random(2*RETRY_TIMES[i])
             end
             print('Warning: The server is currently undergoing temporary maintenance. Retrying in ' .. tostring(retry_secs) .. ' seconds.')
-            i = i-1
+            i = i-1 -- Keep retrying forever
 
         -- Communication was distorted somehow
         elseif code == 502 or code > 503 then
